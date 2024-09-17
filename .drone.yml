@@ -1,7 +1,7 @@
 ---
 kind: pipeline
 type: docker
-name: build frontend
+name: build
 trigger: { event: [ push ] }
 volumes: [ { name: cache, host: { path: /data/ci-cache-docker } } ]
 steps:
@@ -13,7 +13,7 @@ steps:
   - printf $(git rev-parse --abbrev-ref HEAD) > BRANCH
   - cat BRANCH
   - git submodule update --init --recursive --depth 1
-- name: build-undexer
+- name: build
   image: docker:24.0.7-alpine3.18
   volumes: [ { name: cache, path: /cache/docker } ]
   privileged: true

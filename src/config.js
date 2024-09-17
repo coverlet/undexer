@@ -15,6 +15,12 @@ export const RPC_URL =
   //process.env.RPC_URL || 'https://rpc.housefire.tududes.com/';
   process.env.RPC_URL || 'https://rpc.knowable.run/';
 
+export const BLOCK_POLL =
+  Boolean(process.env.BLOCK_POLL) || false
+
+export const CONTROL_URL =
+  Boolean(process.env.CONTROL_URL) || 'ws://localhost:26666/ws'
+
 export const NODE_LOWEST_BLOCK_HEIGHT =
   process.env.NODE_LOWEST_BLOCK_HEIGHT ?? 0; //237907;
 

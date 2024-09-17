@@ -15,6 +15,9 @@ export const totalProposals = () =>
 export const totalBlocks = () =>
   DB.Block.count()
 
+export const latestEpoch = () =>
+  DB.Block.max('epoch')
+
 export const latestBlock = () =>
   DB.Block.max('blockHeight')
 

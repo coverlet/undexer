@@ -126,7 +126,6 @@ export class PollingBlockIndexer extends BlockIndexer {
   run () {
     return runForever(BLOCK_UPDATE_INTERVAL, this.tryUpdateBlocks.bind(this))
   }
-
   /** Called every `BLOCK_UPDATE_INTERVAL` msec by a `setInterval` in `bin/indexer.js` */
   async tryUpdateBlocks () {
     // Setting `NODE_LOWEST_BLOCK_HEIGHT` allows a minimum block to be set
@@ -145,12 +144,52 @@ export class PollingBlockIndexer extends BlockIndexer {
 /** Connects to a WebSocket that exposes a pausable full node,
  * and listens for sync progressblock notifications. */
 export class ControllingBlockIndexer extends BlockIndexer {
+
   constructor ({ ws, ...rest }) {
     super(rest)
     this.ws = ws
   }
-  run () {
-    this.socket = new WebSocket(this.ws)
-    this.socket.on('message', data => console.log(data))
+
+  async run () {
+
+    let [
+      latestBlockOnChain,
+      latestEpochOnChain,
+      latestBlockInDB,
+      latestEpochInDB,
+    ] = await Promise.all([
+      this.chain.fetchHeight(),
+      this.chain.fetchEpoch(),
+      Query.latestBlock(),
+      Query.latestEpoch()
+    ])
+    console.log('Latest block on chain:', latestBlockOnChain)
+    console.log('Latest epoch on chain:', latestEpochOnChain)
+    console.log('Latest block in DB:', latestBlockInDB)
+    console.log('Latest epoch in DB:', latestEpochInDB)
+
+    // Continually try to connect to control socket
+    ;(function connect () {
+      try {
+        this.socket = new WebSocket(this.ws)
+        console.log('Connecting to', this.ws)
+        this.socket.addEventListener('open', () => {
+          console.log('Connected to', this.ws)
+        })
+        this.socket.addEventListener('close', () => {
+          console.log('Disconnected from', this.ws, 'reconnecting...')
+          connect()
+        })
+        this.socket.addEventListener('message', data => {
+          console.log(data)
+        })
+      } catch (e) {
+        console.error(e)
+        console.error('Failed to connect to', this.ws, 'retrying in 1s')
+        setTimeout(connect, 1000)
+      }
+    }.bind(this))()
+
   }
+
 }

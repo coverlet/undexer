@@ -133,10 +133,11 @@ export class BlockIndexer {
     const attributes                = ['namadaAddress']
     const where                     = { state: { state: "Consensus" }, epoch: pastEpoch }
     const getAddresses              = async x => (await x).map(x=>x.toJSON().namadaAddress)
-    const validatorAddrsInDB        = getAddresses(DB.Validator.findAll({ attributes }))
-    const consValidatorAddrsInDB    = getAddresses(DB.Validator.findAll({ attributes, where }))
+    const validatorAddrsInDB        = await getAddresses(DB.Validator.findAll({attributes}))
+    const consValidatorAddrsInDB    = await getAddresses(DB.Validator.findAll({attributes, where}))
     const validatorAddrsOnChain     = await this.chain.fetchValidatorAddresses()
-    const consValidatorAddrsOnChain = await this.chain.fetchValidatorsConsensus()
+    const addressesOnly             = x => x.map(({address})=>address)
+    const consValidatorAddrsOnChain = addressesOnly(await this.chain.fetchValidatorsConsensus())
     const consValidatorAddressSet   = set(consValidatorAddrsOnChain, consValidatorAddrsInDB)
     const validatorAddrs            = [...set(validatorAddrsOnChain, validatorAddrsInDB) ]
     const consValidatorAddrs        = [...consValidatorAddressSet]
@@ -158,7 +159,7 @@ export class BlockIndexer {
     const where = { namadaAddress: validator.namadaAddress }
     const existing = await DB.Validator.findOne({ where })
     if (existing) {
-      console.log("Updating validator", JSON.stringify(validator, stringifier))
+      console.log("Updating validator", validator.namadaAddress)
       await Object.assign(existing, {
         publicKey: validator.publicKey,
         pastPublicKeys: appendNonNull(existing.pastPublicKeys, validator.publicKey),
@@ -327,14 +328,8 @@ export class ControllingBlockIndexer extends BlockIndexer {
   }
 
   async updateCounters () {
-    // Reset sync if chain is behind database, or more than 2 blocks ahead of database.
-    /*if (this.latestBlockInDB > this.latestBlockOnChain) {
-      this.log.warn(`🚨 !!!!!!!!!! DB ahead of chain (block ${this.latestBlockInDB} > ${this.latestBlockOnChain}). Restarting from scratch.`)
-      await this.restart()
-    } else if (this.latestEpochInDB > this.latestEpochOnChain) {
-      this.log.warn(`🚨 !!!!!!!!!! DB ahead of chain (epoch ${this.latestEpochInDB} > ${this.latestEpochOnChain}). Restarting from scratch.`)
-      await this.restart()
-    } else*/
+    // Reset sync if chain is more than 2 epochs ahead of database.
+    // This is because some data is only stored for 2 epochs' time, then pruned.
     if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
       this.log.warn(`🚨 !!!!!!!!!! DB more than 2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Restarting from scratch.`)
       await this.restart()

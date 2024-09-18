@@ -12,10 +12,6 @@ import db from '../src/db.js'
 import { START_FROM_SCRATCH } from '../src/config.js'
 await db.sync({ force: Boolean(START_FROM_SCRATCH) })
 
-console.log('⏳ Connecting...')
-import getRPC from "../src/rpc.js"
-const chain = await getRPC()
-
 import EventEmitter from "node:events"
 const events = new EventEmitter()
 
@@ -38,7 +34,10 @@ import { runForever } from '../src/utils.js'
 import { PollingBlockIndexer, ControllingBlockIndexer } from '../src/block.js'
 import { tryUpdateEpochs } from '../src/epoch.js'
 
+console.log('⏳ Connecting...')
+import getRPC from "../src/rpc.js"
 if (BLOCK_POLL) {
+  const chain = await getRPC()
   await Promise.all([
     runForever(EPOCH_UPDATE_INTERVAL,     tryUpdateEpochs,     chain),
     runForever(VALIDATOR_UPDATE_INTERVAL, tryUpdateValidators, chain),
@@ -47,5 +46,5 @@ if (BLOCK_POLL) {
     new PollingBlockIndexer({ chain, events }).run()
   ])
 } else {
-  new ControllingBlockIndexer({ chain, ws: CONTROL_URL }).run()
+  new ControllingBlockIndexer({ chain: await getRPC(), ws: CONTROL_URL }).run()
 }

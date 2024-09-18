@@ -76,8 +76,7 @@ export class BlockIndexer {
     }), { update: 'block', height })
     // Log performed updates.
     const t = performance.now() - t0
-    console = new Console(`Block ${height}`)
-    for (const {id} of block.transactions) console.log("++ Added transaction", id)
+    for (const {id} of block.transactions) console.log("Block", height, "TX", id)
     console.log("++ Added block", height, 'in', t.toFixed(0), 'msec')
     //console.br()
   }

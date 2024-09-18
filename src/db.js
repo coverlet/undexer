@@ -136,8 +136,9 @@ export const
   }),
 
   Validator = db.define('validator', {
+    id:                     IntegerPrimaryKey(true),
     epoch:                  { type: INTEGER },
-    namadaAddress:          StringPrimaryKey(),
+    namadaAddress:          { type: TEXT },
     publicKey:              { type: TEXT, allowNull: true },
     pastPublicKeys:         NullableJSONField('pastPublicKeys'),
     consensusAddress:       { type: TEXT, allowNull: true },

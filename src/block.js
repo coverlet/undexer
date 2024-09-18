@@ -144,23 +144,24 @@ export class BlockIndexer {
     const nonConsValidatorAddrs     = validatorAddrs.filter(x=>!consValidatorAddressSet.has(x))
     let validators = 0
     for (const address of consValidatorAddrs) {
-      await this.updateValidator(await this.chain.fetchValidator(address))
+      await this.updateValidator(await this.chain.fetchValidator(address), epoch)
       validators++
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `consensus validators`)
     for (const address of nonConsValidatorAddrs) {
-      await this.updateValidator(await this.chain.fetchValidator(address))
+      await this.updateValidator(await this.chain.fetchValidator(address), epoch)
       validators++
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `validators total`)
   }
 
-  async updateValidator (validator) {
-    const where = { namadaAddress: validator.namadaAddress }
+  async updateValidator (validator, epoch) {
+    const where = { namadaAddress: validator.namadaAddress, epoch }
     const existing = await DB.Validator.findOne({ where })
     if (existing) {
-      console.log("Updating validator", validator.namadaAddress)
+      console.log('Epoch', pad(epoch), "updating validator", validator.namadaAddress)
       await Object.assign(existing, {
+        epoch,
         publicKey: validator.publicKey,
         pastPublicKeys: appendNonNull(existing.pastPublicKeys, validator.publicKey),
         consensusAddress: validator.address,
@@ -175,7 +176,7 @@ export class BlockIndexer {
       return { updated: true }
     } else {
       console.log("Adding validator", validator.namadaAddress)
-      await DB.Validator.create(validator)
+      await DB.Validator.create(Object.assign(validator, { epoch }))
       return { added: true }
     }
   }

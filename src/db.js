@@ -129,7 +129,14 @@ export const
     info:      NullableJSONField('info'),
   }),
 
+  Epoch = db.define('epoch', {
+    id:         IntegerPrimaryKey(true),
+    totalStake: { type: INTEGER },
+    parameters: JSONField('parameters')
+  }),
+
   Validator = db.define('validator', {
+    epoch:                  { type: INTEGER },
     namadaAddress:          StringPrimaryKey(),
     publicKey:              { type: TEXT, allowNull: true },
     pastPublicKeys:         NullableJSONField('pastPublicKeys'),
@@ -145,7 +152,7 @@ export const
 
   Block = db.define('block', {
     ...blockMeta(),
-    epoch:        { type: INTEGER, allowNull: true },
+    epoch:        { type: INTEGER },
     blockHash:    StringPrimaryKey(),
     blockHeader:  JSONField('blockHeader'),
     rpcResponses: JSONField('rpcResponses'),

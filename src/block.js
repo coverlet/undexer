@@ -128,56 +128,36 @@ export class BlockIndexer {
     console.log('Epoch', pad(epoch), 'total stake:', total)
   }
 
-  async updateValidators (epoch, pastEpoch = epoch) {
-    const attributes                = ['namadaAddress']
-    const where                     = { state: { state: "Consensus" }, epoch: pastEpoch }
-    const getAddresses              = async x => (await x).map(x=>x.toJSON().namadaAddress)
-    const validatorAddrsInDB        = await getAddresses(DB.Validator.findAll({attributes}))
-    const consValidatorAddrsInDB    = await getAddresses(DB.Validator.findAll({attributes, where}))
-    const validatorAddrsOnChain     = await this.chain.fetchValidatorAddresses()
-    const addressesOnly             = x => x.map(({address})=>address)
-    const consValidatorAddrsOnChain = addressesOnly(await this.chain.fetchValidatorsConsensus())
-    const consValidatorAddressSet   = set(consValidatorAddrsOnChain, consValidatorAddrsInDB)
-    const validatorAddrs            = [...set(validatorAddrsOnChain, validatorAddrsInDB) ]
-    const consValidatorAddrs        = [...consValidatorAddressSet]
-    const nonConsValidatorAddrs     = validatorAddrs.filter(x=>!consValidatorAddressSet.has(x))
+  async updateValidators (epoch) {
     let validators = 0
-    for (const address of consValidatorAddrs) {
+    const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
+      this.chain.fetchValidatorsConsensus(epoch),
+      (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch) : Promise.resolve([])
+    ])
+    const addressOnly = x => x.map(y=>y.address)
+    const consensusValidators = set(
+      addressOnly(currentConsensusValidators),
+      addressOnly(previousConsensusValidators),
+    )
+    for (const address of [...consensusValidators]) {
       await this.updateValidator(await this.chain.fetchValidator(address), epoch)
       validators++
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `consensus validators`)
-    for (const address of nonConsValidatorAddrs) {
-      await this.updateValidator(await this.chain.fetchValidator(address), epoch)
-      validators++
+    const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
+    for (const address of otherValidators) {
+      if (!consensusValidators.has(address)) {
+        await this.updateValidator(await this.chain.fetchValidator(address), epoch)
+        validators++
+      }
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `validators total`)
   }
 
   async updateValidator (validator, epoch) {
-    const where = { namadaAddress: validator.namadaAddress, epoch }
-    const existing = await DB.Validator.findOne({ where })
-    if (existing) {
-      console.log('Epoch', pad(epoch), "updating validator", validator.namadaAddress)
-      await Object.assign(existing, {
-        epoch,
-        publicKey: validator.publicKey,
-        pastPublicKeys: appendNonNull(existing.pastPublicKeys, validator.publicKey),
-        consensusAddress: validator.address,
-        pastConsensusAddresses: appendNonNull(existing.pastConsensusAddresses, validator.address),
-        votingPower: validator.votingPower,
-        proposerPriority: validator.proposerPriority,
-        metadata: validator.metadata,
-        commission: validator.commission,
-        stake: validator.stake,
-        state: validator.state,
-      }).save()
-      return { updated: true }
-    } else {
-      console.log("Adding validator", validator.namadaAddress)
-      await DB.Validator.create(Object.assign(validator, { epoch }))
-      return { added: true }
-    }
+    console.log("Adding validator", validator.namadaAddress)
+    await DB.Validator.upsert(Object.assign(validator, { epoch }))
+    return { added: true }
   }
 
 }
@@ -394,12 +374,12 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
 }
 
-const pad = x => String(x).padStart(10)
-
-const stringifier = (_, v) => (typeof v === 'bigint') ? String(v) : v
+const pad = x => String(x).padEnd(10)
 
 const set = (a, b) => new Set([...a||[], ...b||[]])
 
 const distinct = x => [...new Set(x)]
+
+const stringifier = (_, v) => (typeof v === 'bigint') ? String(v) : v
 
 const appendNonNull = (x, y) => distinct(set(x, [y])).filter(Boolean)

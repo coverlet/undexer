@@ -15,8 +15,14 @@ const rpcVariant = async url => {
       connection = await Namada.connect({ url, decoder })
       break
     } catch (e) {
-      console.error(e)
-      console.warn('Failed to connect to RPC', url, '; retrying in 1s')
+      if (e.cause?.code == 'ECONNREFUSED') {
+        console.error(`ECONNREFUSED connecting to RPC ${url}; retrying in 1s`)
+      } else if (e.message === 'must provide a non-empty value') {
+        console.error(`Empty node status at RPC ${url}; retrying in 1s`)
+      } else {
+        console.error(e)
+        console.error(`Failed to connect to RPC ${url}; retrying in 1s`)
+      }
       await new Promise(resolve=>setTimeout(resolve, 1000))
     }
   }

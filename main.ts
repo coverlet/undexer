@@ -45,7 +45,7 @@ export default class UndexerCommands extends Commands {
     this.log.br().log('Done.')
   })
 
-  dbSyncForce = this.command({
+  dbSyncDrop = this.command({
     name: "db sync drop",
     info: "UNSAFE: delete and re-create database with latest schema"
   }, async () => {

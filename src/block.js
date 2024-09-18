@@ -10,6 +10,7 @@ import {
 } from './config.js'
 
 const console = new Console('Block')
+console.debug = () => {}
 
 /** Base block indexer.
  *
@@ -19,6 +20,8 @@ const console = new Console('Block')
 export class BlockIndexer {
   constructor ({ chain, events }) {
     this.chain  = chain
+    this.chain.log.debug = () => {}
+    this.chain.connections[0].log.debug = () => {}
     this.events = events
   }
 
@@ -77,7 +80,7 @@ export class BlockIndexer {
     const console = new Console(`Block ${height}`)
     for (const {id} of block.transactions) console.log("++ Added transaction", id)
     console.log("++ Added block", height, 'in', t.toFixed(0), 'msec');
-    console.br()
+    //console.br()
   }
 
   /** Update a single transaction in the database. */
@@ -149,44 +152,16 @@ export class ControllingBlockIndexer extends BlockIndexer {
   constructor ({ ws, ...rest }) {
     super(rest)
     this.ws = ws
+    this.latestBlockOnChain = BigInt(0)
+    this.latestEpochOnChain = BigInt(0)
+    this.latestBlockInDB    = BigInt(0)
+    this.latestEpochInDB    = BigInt(0)
   }
 
   async run () {
 
-    // Current state of chain
-    let latestBlockOnChain, latestEpochOnChain
-    const updateLatestOnChain = () => Promise.all([
-      this.chain.fetchHeight(),
-      this.chain.fetchEpoch(),
-    ]).then(([block, epoch])=>{
-      if (latestBlockOnChain != BigInt(block)) {
-        latestBlockOnChain = BigInt(block)
-        console.log('New chain height:', latestBlockOnChain)
-      }
-      if (latestEpochOnChain != BigInt(epoch)) {
-        latestEpochOnChain = BigInt(epoch)
-        console.log('New chain epoch: ', latestEpochOnChain)
-      }
-    })
-
-    // Current state of indexed data
-    let latestBlockInDB, latestEpochInDB
-    const updateLatestInDB = () => Promise.all([
-      Query.latestBlock(),
-      Query.latestEpoch(),
-    ]).then(([block, epoch])=>{
-      if (latestBlockInDB != BigInt(block||0)) {
-        latestBlockInDB = BigInt(block||0)
-        console.log('New DB height:   ', latestBlockOnChain)
-      }
-      if (latestEpochInDB != BigInt(epoch||0)) {
-        latestEpochInDB = BigInt(epoch||0)
-        console.log('New DB epoch:    ', latestEpochOnChain)
-      }
-    })
-
     // Establish current state
-    await Promise.all([ updateLatestOnChain(), updateLatestInDB() ])
+    await this.update()
 
     // Auto-renewing lock. The main loop waits for it when there are no new blocks.
     // When the node has synced more blocks, it emits a notification via websocket.
@@ -220,14 +195,13 @@ export class ControllingBlockIndexer extends BlockIndexer {
           this.socket = connect(backoff + 250)
         })
 
-        socket.addEventListener('message', async message => {
+        socket.addEventListener('message', message => {
           const data = JSON.parse(message.data)
           if (data.synced) {
-            let {block, epoch} = data.synced
-            block = BigInt(block)
-            epoch = BigInt(epoch)
-            if (block > latestBlockInDB) {
-              await updateLatestOnChain()
+            const {block, epoch} = data.synced
+            this.latestBlockOnChain = BigInt(block)
+            this.latestEpochOnChain = BigInt(epoch)
+            if (this.latestBlockOnChain > this.latestBlockInDB) {
               gotMoreBlocks()
             }
           }
@@ -242,11 +216,11 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
     await connect()
 
+    // Main indexing loop that waits for new blocks
     while (true) {
-
-      if (latestBlockInDB < latestBlockOnChain) {
-        for (let height = latestBlockInDB + 1n; height <= latestBlockOnChain; height++) {
-          console.log('Index block', height)
+      if (this.latestBlockInDB < this.latestBlockOnChain) {
+        for (let height = this.latestBlockInDB + 1n; height <= this.latestBlockOnChain; height++) {
+          console.debug('Index block', height)
           while (true) try {
             await this.updateBlock({ height })
             break
@@ -256,19 +230,83 @@ export class ControllingBlockIndexer extends BlockIndexer {
             await new Promise(resolve=>setTimeout(resolve, 1000))
           }
         }
-        await updateLatestInDB()
-        console.log('Waiting for more blocks')
-        ;(await this.socket).send(JSON.stringify({resume:{}}))
+        await this.updateLatestInDB()
+        console.debug('Waiting for more blocks')
+        if (await this.isPaused()) await this.resume()
         await moreBlocks
       } else {
-        await Promise.all([ updateLatestOnChain(), updateLatestInDB() ])
-        if (!(await (await fetch('http://localhost:25555/')).json()).services.proxy) {
-          ;(await this.socket).send(JSON.stringify({resume:{}}))
-        }
+        await this.update()
+        if (await this.isPaused()) await this.resume()
       }
-
     }
 
   }
 
+  async isPaused () {
+    const status = await (await fetch('http://localhost:25555/')).json()
+    return !status.services.proxy
+  }
+
+  async resume () {
+    const socket = await this.socket
+    console.log('Resume sync')
+    socket.send(JSON.stringify({resume:{}}))
+  }
+
+  update () {
+    return Promise.all([ this.updateLatestOnChain(), this.updateLatestInDB() ])
+  }
+
+  // Current state of chain
+  async updateLatestOnChain () {
+    return await Promise.all([
+      this.chain.fetchHeight(),
+      this.chain.fetchEpoch(),
+    ]).then(([block, epoch])=>{
+      if (this.latestEpochOnChain != BigInt(epoch)) {
+        this.latestEpochOnChain = BigInt(epoch)
+        console.log(
+          `Fetched chain epoch:  `,
+          `${pad(this.latestEpochOnChain)}`,
+          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
+        )
+      }
+      if (this.latestBlockOnChain != BigInt(block)) {
+        this.latestBlockOnChain = BigInt(block)
+        console.log(
+          `Fetched chain height: `,
+          `${pad(this.latestBlockOnChain)}`,
+          `(${pad(this.latestBlockOnChain - this.latestBlockInDB)} behind)`
+        )
+      }
+    })
+  }
+
+  // Current state of indexed data
+  async updateLatestInDB () {
+    return await Promise.all([
+      Query.latestBlock(),
+      Query.latestEpoch(),
+    ]).then(([block, epoch])=>{
+      if (this.latestEpochInDB != BigInt(epoch||0)) {
+        this.latestEpochInDB = BigInt(epoch||0)
+        console.debug(
+          `Queried DB epoch:     `,
+          `${pad(this.latestEpochOnChain)}`,
+          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
+        )
+      }
+      if (this.latestBlockInDB != BigInt(block||0)) {
+        this.latestBlockInDB = BigInt(block||0)
+        console.debug(
+          `Queried DB height:    `,
+          `${pad(this.latestBlockOnChain)}`,
+          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
+        )
+      }
+    })
+  }
+
 }
+
+const pad = x => String(x).padStart(10)

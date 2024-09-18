@@ -159,10 +159,14 @@ export class ControllingBlockIndexer extends BlockIndexer {
       this.chain.fetchHeight(),
       this.chain.fetchEpoch(),
     ]).then(([block, epoch])=>{
-      latestBlockOnChain = block
-      latestEpochOnChain = epoch
-      console.log('Latest block on chain:', latestBlockOnChain)
-      console.log('Latest epoch on chain:', latestEpochOnChain)
+      if (latestBlockOnChain != BigInt(block)) {
+        latestBlockOnChain = BigInt(block)
+        console.log('New chain height:', latestBlockOnChain)
+      }
+      if (latestEpochOnChain != BigInt(epoch)) {
+        latestEpochOnChain = BigInt(epoch)
+        console.log('New chain epoch: ', latestEpochOnChain)
+      }
     })
 
     // Current state of indexed data
@@ -171,10 +175,14 @@ export class ControllingBlockIndexer extends BlockIndexer {
       Query.latestBlock(),
       Query.latestEpoch(),
     ]).then(([block, epoch])=>{
-      latestBlockInDB = BigInt(block||0)
-      latestEpochInDB = BigInt(epoch||0)
-      console.log('Latest block in DB:', latestBlockInDB)
-      console.log('Latest epoch in DB:', latestEpochInDB)
+      if (latestBlockInDB != BigInt(block||0)) {
+        latestBlockInDB = BigInt(block||0)
+        console.log('New DB height:   ', latestBlockOnChain)
+      }
+      if (latestEpochInDB != BigInt(epoch||0)) {
+        latestEpochInDB = BigInt(epoch||0)
+        console.log('New DB epoch:    ', latestEpochOnChain)
+      }
     })
 
     // Establish current state
@@ -236,23 +244,28 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
     while (true) {
 
-      for (let height = latestBlockInDB + 1n; height <= latestBlockOnChain; height++) {
-        console.log('Index block', height)
-        while (true) try {
-          await this.updateBlock({ height })
-          break
-        } catch (e) {
-          console.error(e)
-          console.error('Failed to update block', e, 'waiting 1s and retrying...')
-          await new Promise(resolve=>setTimeout(resolve, 1000))
+      if (latestBlockInDB < latestBlockOnChain) {
+        for (let height = latestBlockInDB + 1n; height <= latestBlockOnChain; height++) {
+          console.log('Index block', height)
+          while (true) try {
+            await this.updateBlock({ height })
+            break
+          } catch (e) {
+            console.error(e)
+            console.error('Failed to update block', e, 'waiting 1s and retrying...')
+            await new Promise(resolve=>setTimeout(resolve, 1000))
+          }
+        }
+        await updateLatestInDB()
+        console.log('Waiting for more blocks')
+        ;(await this.socket).send(JSON.stringify({resume:{}}))
+        await moreBlocks
+      } else {
+        await Promise.all([ updateLatestOnChain(), updateLatestInDB() ])
+        if (!(await (await fetch('http://localhost:25555/')).json()).services.proxy) {
+          ;(await this.socket).send(JSON.stringify({resume:{}}))
         }
       }
-
-      await updateLatestInDB()
-
-      console.log('Waiting for more blocks')
-
-      await moreBlocks
 
     }
 

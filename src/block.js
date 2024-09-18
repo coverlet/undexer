@@ -10,7 +10,7 @@ import {
 } from './config.js'
 import EventEmitter from "node:events"
 
-const console = new Console('Block')
+const console = new Console('')
 console.debug = () => {}
 
 /** Base block indexer.

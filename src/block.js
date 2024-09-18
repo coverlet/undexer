@@ -1,3 +1,4 @@
+//deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js';
 import * as Query from './query.js';
@@ -55,7 +56,7 @@ export class BlockIndexer {
         blockHash:    block.hash,
         blockHeader:  block.header,
         blockData:    JSON.parse(block.responses?.block.response||"null"),
-        blockResults: JSON.parse(block.responses?.results.response||"null"),
+        blockResults: JSON.parse(block.responses?.results?.response||"null"),
         rpcResponses: block.responses,
         epoch:        await this.chain.fetchEpoch({ height }).catch(()=>{
           console.warn('Could not fetch epoch for block', height, '- will retry later')
@@ -152,43 +153,108 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
   async run () {
 
-    let [
-      latestBlockOnChain,
-      latestEpochOnChain,
-      latestBlockInDB,
-      latestEpochInDB,
-    ] = await Promise.all([
+    // Current state of chain
+    let latestBlockOnChain, latestEpochOnChain
+    const updateLatestOnChain = () => Promise.all([
       this.chain.fetchHeight(),
       this.chain.fetchEpoch(),
+    ]).then(([block, epoch])=>{
+      latestBlockOnChain = block
+      latestEpochOnChain = epoch
+      console.log('Latest block on chain:', latestBlockOnChain)
+      console.log('Latest epoch on chain:', latestEpochOnChain)
+    })
+
+    // Current state of indexed data
+    let latestBlockInDB, latestEpochInDB
+    const updateLatestInDB = () => Promise.all([
       Query.latestBlock(),
-      Query.latestEpoch()
-    ])
-    console.log('Latest block on chain:', latestBlockOnChain)
-    console.log('Latest epoch on chain:', latestEpochOnChain)
-    console.log('Latest block in DB:', latestBlockInDB)
-    console.log('Latest epoch in DB:', latestEpochInDB)
+      Query.latestEpoch(),
+    ]).then(([block, epoch])=>{
+      latestBlockInDB = BigInt(block||0)
+      latestEpochInDB = BigInt(epoch||0)
+      console.log('Latest block in DB:', latestBlockInDB)
+      console.log('Latest epoch in DB:', latestEpochInDB)
+    })
+
+    // Establish current state
+    await Promise.all([ updateLatestOnChain(), updateLatestInDB() ])
+
+    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
+    // When the node has synced more blocks, it emits a notification via websocket.
+    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
+    // to ingest the new block(s).
+    let moreBlocks = new Promise(()=>{/*ignored*/})
+    let gotMoreBlocks = () => {/*ignored*/}
+    const needMoreBlocks = () => {
+      moreBlocks = new Promise(resolve=>{gotMoreBlocks=resolve}).then(needMoreBlocks)
+    }
+    needMoreBlocks()
 
     // Continually try to connect to control socket
-    ;(function connect () {
+    const connect = (backoff = 0) => this.socket = new Promise(async resolve => {
+      if (backoff > 0) {
+        console.log('Waiting for', backoff, 'msec before connecting to socket...')
+        await new Promise(resolve=>setTimeout(resolve, backoff))
+      }
       try {
-        this.socket = new WebSocket(this.ws)
         console.log('Connecting to', this.ws)
-        this.socket.addEventListener('open', () => {
+        const socket = new WebSocket(this.ws)
+
+        socket.addEventListener('open', () => {
           console.log('Connected to', this.ws)
+          backoff = 0
+          resolve(socket)
         })
-        this.socket.addEventListener('close', () => {
+
+        socket.addEventListener('close', () => {
           console.log('Disconnected from', this.ws, 'reconnecting...')
-          connect()
+          this.socket = connect(backoff + 250)
         })
-        this.socket.addEventListener('message', data => {
-          console.log(data)
+
+        socket.addEventListener('message', async message => {
+          const data = JSON.parse(message.data)
+          if (data.synced) {
+            let {block, epoch} = data.synced
+            block = BigInt(block)
+            epoch = BigInt(epoch)
+            if (block > latestBlockInDB) {
+              await updateLatestOnChain()
+              gotMoreBlocks()
+            }
+          }
         })
+
       } catch (e) {
         console.error(e)
         console.error('Failed to connect to', this.ws, 'retrying in 1s')
-        setTimeout(connect, 1000)
+        this.socket = connect(backoff + 250)
       }
-    }.bind(this))()
+    })
+
+    await connect()
+
+    while (true) {
+
+      for (let height = latestBlockInDB + 1n; height <= latestBlockOnChain; height++) {
+        console.log('Index block', height)
+        while (true) try {
+          await this.updateBlock({ height })
+          break
+        } catch (e) {
+          console.error(e)
+          console.error('Failed to update block', e, 'waiting 1s and retrying...')
+          await new Promise(resolve=>setTimeout(resolve, 1000))
+        }
+      }
+
+      await updateLatestInDB()
+
+      console.log('Waiting for more blocks')
+
+      await moreBlocks
+
+    }
 
   }
 

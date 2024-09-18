@@ -8,6 +8,7 @@ import {
   VALIDATOR_TRANSACTIONS,
   NODE_LOWEST_BLOCK_HEIGHT
 } from './config.js'
+import EventEmitter from "node:events"
 
 const console = new Console('Block')
 console.debug = () => {}
@@ -19,10 +20,11 @@ console.debug = () => {}
  * in the subclasses. */
 export class BlockIndexer {
   constructor ({ chain, events }) {
-    this.chain  = chain
+    this.log = console
+    this.chain = chain
     this.chain.log.debug = () => {}
     this.chain.connections[0].log.debug = () => {}
-    this.events = events
+    this.events = events || new EventEmitter()
   }
 
   /** Update blocks between startHeight and endHeight */
@@ -38,6 +40,8 @@ export class BlockIndexer {
   /** Update a single block in the database. */
   async updateBlock ({ height, block }) {
     const t0 = performance.now()
+
+    let console = this.log
 
     // If no block was passed, fetch it.
     if (!block) while (true) try {
@@ -77,7 +81,7 @@ export class BlockIndexer {
 
     // Log performed updates.
     const t = performance.now() - t0
-    const console = new Console(`Block ${height}`)
+    console = new Console(`Block ${height}`)
     for (const {id} of block.transactions) console.log("++ Added transaction", id)
     console.log("++ Added block", height, 'in', t.toFixed(0), 'msec');
     //console.br()
@@ -109,7 +113,7 @@ export class BlockIndexer {
     }
     // Log transaction section types.
     for (const section of sections) {
-      console.log("=> Add section", section.type);
+      console.debug("=> Add section", section.type);
     }
     const data = {
       chainId:     transaction.data.chainId,
@@ -120,8 +124,9 @@ export class BlockIndexer {
       txTime:      transaction.data.timestamp,
       txData:      transaction,
     }
-    console.log("=> Adding transaction", data);
+    //console.debug("=> Adding transaction", data);
     await DB.Transaction.upsert(data, { transaction: dbTransaction });
+    console.log("=> Added transaction", data.txHash);
   }
 }
 
@@ -157,7 +162,12 @@ export class ControllingBlockIndexer extends BlockIndexer {
     this.latestEpochOnChain = BigInt(0)
     this.latestBlockInDB    = BigInt(0)
     this.latestEpochInDB    = BigInt(0)
+    this.epochChanged       = false
 
+    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
+    // When the node has synced more blocks, it emits a notification via websocket.
+    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
+    // to ingest the new block(s).
     this.moreBlocks = new Promise(()=>{/*ignored*/})
     this.gotMoreBlocks = () => {/*ignored*/}
     const needMoreBlocks = () => {
@@ -219,36 +229,46 @@ export class ControllingBlockIndexer extends BlockIndexer {
   }
 
   async mainIndexingLoop () {
-    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
-    // When the node has synced more blocks, it emits a notification via websocket.
-    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
-    // to ingest the new block(s).
-    while (true) {
-      await this.updateEpochedData()
-      if (this.latestBlockInDB < this.latestBlockOnChain) {
-        for (let height = this.latestBlockInDB + 1n; height <= this.latestBlockOnChain; height++) {
-          console.debug('Index block', height)
-          while (true) try {
-            await this.updateBlock({ height })
-            break
-          } catch (e) {
-            console.error(e)
-            console.error('Failed to update block', e, 'waiting 1s and retrying...')
-            await new Promise(resolve=>setTimeout(resolve, 1000))
-          }
-        }
-        await this.updateLatestInDB()
-        console.debug('Waiting for more blocks')
-        if (await this.isPaused()) await this.resume()
-        await this.moreBlocks
-      } else {
-        await this.update()
-        if (await this.isPaused()) await this.resume()
+    while (true) await Promise.all([
+      this.updatePerEpoch(),
+      this.updatePerBlock(),
+    ]).then(async ()=>{
+      await this.update()
+      if (await this.isPaused()) await this.resume()
+    })
+  }
+
+  async updatePerEpoch () {
+    if (this.epochChanged) {
+      const epoch = this.latestEpochOnChain
+      const total = await this.chain.fetchTotalStaked({ epoch })
+      console.log('Epoch', pad(epoch), 'total stake:', total)
+      let validators = 0
+      for await (const validator of this.chain.fetchValidatorsIter({
+        epoch,
+        parallel: true
+      })) {
+        validators++
+        // TODO
       }
+      console.log('Epoch', pad(epoch), 'validators:', validators)
+      this.epochChanged = false
     }
   }
 
-  async updateEpochedData () {
+  async updatePerBlock () {
+    while (true) {
+      await this.update()
+      if (this.latestBlockInDB >= this.latestBlockOnChain) break
+      while (true) try {
+        await this.updateBlock({ height: this.latestBlockInDB + 1n })
+        break
+      } catch (e) {
+        console.error(e)
+        console.error('Failed to update block', e, 'waiting 1s and retrying...')
+        await new Promise(resolve=>setTimeout(resolve, 1000))
+      }
+    }
   }
 
   async isPaused () {
@@ -263,7 +283,10 @@ export class ControllingBlockIndexer extends BlockIndexer {
   }
 
   update () {
-    return Promise.all([ this.updateLatestOnChain(), this.updateLatestInDB() ])
+    return Promise.all([
+      this.updateLatestOnChain(),
+      this.updateLatestInDB()
+    ])
   }
 
   // Current state of chain
@@ -273,6 +296,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
       this.chain.fetchEpoch(),
     ]).then(([block, epoch])=>{
       if (this.latestEpochOnChain != BigInt(epoch)) {
+        this.epochChanged = true
         this.latestEpochOnChain = BigInt(epoch)
         console.log(
           `Fetched chain epoch:  `,

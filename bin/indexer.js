@@ -47,5 +47,5 @@ if (BLOCK_POLL) {
     new PollingBlockIndexer({ chain, events }).run()
   ])
 } else {
-  new ControllingBlockIndexer({ chain, events, ws: CONTROL_URL }).run()
+  new ControllingBlockIndexer({ chain, ws: CONTROL_URL }).run()
 }

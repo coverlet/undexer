@@ -331,7 +331,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
     // Reset sync if chain is more than 2 epochs ahead of database.
     // This is because some data is only stored for 2 epochs' time, then pruned.
     if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      this.log.warn(`🚨 !!!!!!!!!! DB more than 2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Restarting from scratch.`)
+      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
       await this.restart()
     }
     // Fetch up-to-date values of counters

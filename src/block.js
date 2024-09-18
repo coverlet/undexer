@@ -77,7 +77,7 @@ export class BlockIndexer {
     // Log performed updates.
     const t = performance.now() - t0
     for (const {id} of block.transactions) console.log("Block", height, "TX", id)
-    console.log("++ Added block", height, 'in', t.toFixed(0), 'msec')
+    console.log("Added block", height, 'in', t.toFixed(0), 'msec')
     //console.br()
   }
 
@@ -86,7 +86,7 @@ export class BlockIndexer {
     const console = new Console(`Block ${height}, TX ${transaction.id.slice(0, 8)}`)
     const { content, /*sections*/ } = transaction.data
     if (content) {
-      console.log("=> Add content", content.type)
+      console.log("TX content:", content.type)
       const uploadData = { ...content }
       if (GOVERNANCE_TRANSACTIONS.includes(uploadData.type)) {
         uploadData.data.proposalId = Number(uploadData.data.id)
@@ -103,7 +103,7 @@ export class BlockIndexer {
         this.events?.emit("createProposal", content.data, height)
       }
     } else {
-      console.warn(`!! No supported content in tx ${transaction.id}`)
+      console.warn("No supported TX content in", transaction.id)
     }
     // Log transaction section types.
     //for (const section of sections) {

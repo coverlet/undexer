@@ -230,12 +230,18 @@ export class ControllingBlockIndexer extends BlockIndexer {
   }
 
   async run () {
-    // Establish current state
-    await this.update()
     // Continually try to connect to control socket
     await this.connect()
+    // Establish current state. (May restart node sync if out of data.)
+    await this.updateCounters()
     // Fetch data
-    await this.mainIndexingLoop()
+    while (true) await Promise.all([
+      this.updatePerEpoch(),
+      this.updatePerBlock(),
+    ]).then(async ()=>{
+      await this.updateCounters()
+      if (await this.isPaused()) await this.resume()
+    })
   }
 
   connect (backoff = 0) {
@@ -279,16 +285,6 @@ export class ControllingBlockIndexer extends BlockIndexer {
     })
   }
 
-  async mainIndexingLoop () {
-    while (true) await Promise.all([
-      this.updatePerEpoch(),
-      this.updatePerBlock(),
-    ]).then(async ()=>{
-      await this.update()
-      if (await this.isPaused()) await this.resume()
-    })
-  }
-
   async updatePerEpoch () {
     if (this.epochChanged) {
       const epoch = this.latestEpochOnChain
@@ -300,7 +296,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
   async updatePerBlock () {
     while (true) {
-      await this.update()
+      await this.updateCounters()
       if (this.latestBlockInDB >= this.latestBlockOnChain) break
       while (true) try {
         await this.updateBlock({ height: this.latestBlockInDB + 1n })
@@ -324,15 +320,36 @@ export class ControllingBlockIndexer extends BlockIndexer {
     socket.send(JSON.stringify({resume:{}}))
   }
 
-  update () {
-    return Promise.all([
-      this.updateLatestOnChain(),
-      this.updateLatestInDB()
+  async restart () {
+    const socket = await this.socket
+    console.log('Restart sync')
+    socket.send(JSON.stringify({restart:{}, resume:{}}))
+  }
+
+  async updateCounters () {
+    // Reset sync if chain is behind database, or more than 2 blocks ahead of database.
+    if (this.latestBlockInDB > this.latestBlockOnChain) {
+      this.log.warn('🚨 !!!!!!!!!! DB ahead of chain (block). Restarting from scratch.')
+      await this.restart()
+      await this.moreBlocks
+    } else if (this.latestEpochInDB > this.latestEpochOnChain) {
+      this.log.warn('🚨 !!!!!!!!!! DB ahead of chain (epoch). Restarting from scratch.')
+      await this.restart()
+      await this.moreBlocks
+    } else if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
+      this.log.warn('🚨 !!!!!!!!!! DB more than 2 blocks behind chain. Restarting from scratch.')
+      await this.restart()
+      await this.moreBlocks
+    }
+    // Fetch up-to-date values of counters
+    await Promise.all([
+      this.updateCountersChain(),
+      this.updateCountersDB()
     ])
   }
 
   // Current state of chain
-  async updateLatestOnChain () {
+  async updateCountersChain () {
     return await Promise.all([
       this.chain.fetchHeight(),
       this.chain.fetchEpoch(),
@@ -358,7 +375,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
   }
 
   // Current state of indexed data
-  async updateLatestInDB () {
+  async updateCountersDB () {
     return await Promise.all([
       Query.latestBlock(),
       Query.latestEpoch(),

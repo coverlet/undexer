@@ -1,7 +1,7 @@
 //deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
-import * as DB from './db.js';
-import * as Query from './query.js';
+import * as DB from './db.js'
+import * as Query from './query.js'
 import {
   BLOCK_UPDATE_INTERVAL,
   GOVERNANCE_TRANSACTIONS,
@@ -19,8 +19,10 @@ console.debug = () => {}
  * from the chain API. However, listening for new blocks is only implemented
  * in the subclasses. */
 export class BlockIndexer {
+
   constructor ({ chain, events }) {
     this.log = console
+    this.log.debug = () => {}
     this.chain = chain
     this.chain.log.debug = () => {}
     this.chain.connections[0].log.debug = () => {}
@@ -29,7 +31,7 @@ export class BlockIndexer {
 
   /** Update blocks between startHeight and endHeight */
   async updateBlocks (startHeight, endHeight) {
-    console.log("=> Processing blocks from", startHeight, "to", endHeight);
+    console.log("=> Processing blocks from", startHeight, "to", endHeight)
     let height = startHeight
     try { for (; height <= endHeight; height++) await this.updateBlock({ height }) } catch (e) {
       console.error('Failed to index block', height)
@@ -40,9 +42,7 @@ export class BlockIndexer {
   /** Update a single block in the database. */
   async updateBlock ({ height, block }) {
     const t0 = performance.now()
-
     let console = this.log
-
     // If no block was passed, fetch it.
     if (!block) while (true) try {
       block = await this.chain.fetchBlock({ height, raw: true })
@@ -51,11 +51,9 @@ export class BlockIndexer {
       console.error(e)
       await new Promise(resolve=>setTimeout(resolve, 1000))
     }
-
     // Make sure there isn't a mismatch between required and actual height
     height = block.height
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
-
       const data = {
         chainId:      block.header.chainId,
         blockTime:    block.time,
@@ -70,51 +68,48 @@ export class BlockIndexer {
           return undefined
         }),
       }
-      await DB.Block.upsert(data, { transaction: dbTransaction });
-
+      await DB.Block.upsert(data, { transaction: dbTransaction })
       // Update transactions from block:
       for (const transaction of block.transactions) {
         await this.updateTransaction({ height, transaction, dbTransaction })
       }
-
     }), { update: 'block', height })
-
     // Log performed updates.
     const t = performance.now() - t0
     console = new Console(`Block ${height}`)
     for (const {id} of block.transactions) console.log("++ Added transaction", id)
-    console.log("++ Added block", height, 'in', t.toFixed(0), 'msec');
+    console.log("++ Added block", height, 'in', t.toFixed(0), 'msec')
     //console.br()
   }
 
   /** Update a single transaction in the database. */
   async updateTransaction ({ height, transaction, dbTransaction, }) {
     const console = new Console(`Block ${height}, TX ${transaction.id.slice(0, 8)}`)
-    const { content, sections } = transaction.data
+    const { content, /*sections*/ } = transaction.data
     if (content) {
-      console.log("=> Add content", content.type);
+      console.log("=> Add content", content.type)
       const uploadData = { ...content }
       if (GOVERNANCE_TRANSACTIONS.includes(uploadData.type)) {
-        uploadData.data.proposalId = Number(uploadData.data.id);
-        delete uploadData.data.id;
+        uploadData.data.proposalId = Number(uploadData.data.id)
+        delete uploadData.data.id
       }
       // Emit events based on tx content
       if (VALIDATOR_TRANSACTIONS.includes(content.type)) {
-        this.events?.emit("updateValidators", height);
+        this.events?.emit("updateValidators", height)
       }
       if (content.type === "transaction_vote_proposal.wasm") {
-        this.events?.emit("updateProposal", content.data.proposalId, height);
+        this.events?.emit("updateProposal", content.data.proposalId, height)
       }
       if (content.type === "transaction_init_proposal.wasm") {
-        this.events?.emit("createProposal", content.data, height);
+        this.events?.emit("createProposal", content.data, height)
       }
     } else {
       console.warn(`!! No supported content in tx ${transaction.id}`)
     }
     // Log transaction section types.
-    for (const section of sections) {
-      console.debug("=> Add section", section.type);
-    }
+    //for (const section of sections) {
+      //console.debug("=> Add section", section.type)
+    //}
     const data = {
       chainId:     transaction.data.chainId,
       blockHash:   transaction.block.hash,
@@ -124,10 +119,66 @@ export class BlockIndexer {
       txTime:      transaction.data.timestamp,
       txData:      transaction,
     }
-    //console.debug("=> Adding transaction", data);
-    await DB.Transaction.upsert(data, { transaction: dbTransaction });
-    console.log("=> Added transaction", data.txHash);
+    //console.debug("=> Adding transaction", data)
+    await DB.Transaction.upsert(data, { transaction: dbTransaction })
+    console.log("=> Added transaction", data.txHash)
   }
+
+  async updateTotalStake (epoch) {
+    const total = await this.chain.fetchTotalStaked({ epoch })
+    console.log('Epoch', pad(epoch), 'total stake:', total)
+  }
+
+  async updateValidators (epoch, pastEpoch = epoch) {
+    const attributes                = ['namadaAddress']
+    const where                     = { state: { state: "Consensus" }, epoch: pastEpoch }
+    const getAddresses              = async x => (await x).map(x=>x.toJSON().namadaAddress)
+    const validatorAddrsInDB        = getAddresses(DB.Validator.findAll({ attributes }))
+    const consValidatorAddrsInDB    = getAddresses(DB.Validator.findAll({ attributes, where }))
+    const validatorAddrsOnChain     = await this.chain.fetchValidatorAddresses()
+    const consValidatorAddrsOnChain = await this.chain.fetchValidatorsConsensus()
+    const consValidatorAddressSet   = set(consValidatorAddrsOnChain, consValidatorAddrsInDB)
+    const validatorAddrs            = [...set(validatorAddrsOnChain, validatorAddrsInDB) ]
+    const consValidatorAddrs        = [...consValidatorAddressSet]
+    const nonConsValidatorAddrs     = validatorAddrs.filter(x=>!consValidatorAddressSet.has(x))
+    let validators = 0
+    for (const address of consValidatorAddrs) {
+      await this.updateValidator(await this.chain.fetchValidator(address))
+      validators++
+    }
+    console.log('Epoch', pad(epoch), `updated`, validators, `consensus validators`)
+    for (const address of nonConsValidatorAddrs) {
+      await this.updateValidator(await this.chain.fetchValidator(address))
+      validators++
+    }
+    console.log('Epoch', pad(epoch), `updated`, validators, `validators total`)
+  }
+
+  async updateValidator (validator) {
+    const where = { namadaAddress: validator.namadaAddress }
+    const existing = await DB.Validator.findOne({ where })
+    if (existing) {
+      console.log("Updating validator", JSON.stringify(validator, stringifier))
+      await Object.assign(existing, {
+        publicKey: validator.publicKey,
+        pastPublicKeys: appendNonNull(existing.pastPublicKeys, validator.publicKey),
+        consensusAddress: validator.address,
+        pastConsensusAddresses: appendNonNull(existing.pastConsensusAddresses, validator.address),
+        votingPower: validator.votingPower,
+        proposerPriority: validator.proposerPriority,
+        metadata: validator.metadata,
+        commission: validator.commission,
+        stake: validator.stake,
+        state: validator.state,
+      }).save()
+      return { updated: true }
+    } else {
+      console.log("Adding validator", validator.namadaAddress)
+      await DB.Validator.create(validator)
+      return { added: true }
+    }
+  }
+
 }
 
 /** Polls the chain for new blocks on a given interval. */
@@ -145,7 +196,7 @@ export class PollingBlockIndexer extends BlockIndexer {
     if (latestBlockOnChain > latestBlockInDb) {
       await this.updateBlocks(latestBlockInDb + 1, latestBlockOnChain)
     } else {
-      console.info("=> No new blocks");
+      console.info("=> No new blocks")
     }
   }
 }
@@ -241,17 +292,8 @@ export class ControllingBlockIndexer extends BlockIndexer {
   async updatePerEpoch () {
     if (this.epochChanged) {
       const epoch = this.latestEpochOnChain
-      const total = await this.chain.fetchTotalStaked({ epoch })
-      console.log('Epoch', pad(epoch), 'total stake:', total)
-      let validators = 0
-      for await (const validator of this.chain.fetchValidatorsIter({
-        epoch,
-        parallel: true
-      })) {
-        validators++
-        // TODO
-      }
-      console.log('Epoch', pad(epoch), 'validators:', validators)
+      await this.updateTotalStake(epoch)
+      await this.updateValidators(epoch)
       this.epochChanged = false
     }
   }
@@ -343,3 +385,11 @@ export class ControllingBlockIndexer extends BlockIndexer {
 }
 
 const pad = x => String(x).padStart(10)
+
+const stringifier = (_, v) => (typeof v === 'bigint') ? String(v) : v
+
+const set = (a, b) => new Set([...a||[], ...b||[]])
+
+const distinct = x => [...new Set(x)]
+
+const appendNonNull = (x, y) => distinct(set(x, [y])).filter(Boolean)

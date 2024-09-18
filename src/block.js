@@ -152,30 +152,33 @@ export class ControllingBlockIndexer extends BlockIndexer {
   constructor ({ ws, ...rest }) {
     super(rest)
     this.ws = ws
+
     this.latestBlockOnChain = BigInt(0)
     this.latestEpochOnChain = BigInt(0)
     this.latestBlockInDB    = BigInt(0)
     this.latestEpochInDB    = BigInt(0)
+
+    this.moreBlocks = new Promise(()=>{/*ignored*/})
+    this.gotMoreBlocks = () => {/*ignored*/}
+    const needMoreBlocks = () => {
+      this.moreBlocks = new Promise(resolve=>{
+        this.gotMoreBlocks = resolve
+      }).then(needMoreBlocks)
+    }
+    needMoreBlocks()
   }
 
   async run () {
-
     // Establish current state
     await this.update()
-
-    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
-    // When the node has synced more blocks, it emits a notification via websocket.
-    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
-    // to ingest the new block(s).
-    let moreBlocks = new Promise(()=>{/*ignored*/})
-    let gotMoreBlocks = () => {/*ignored*/}
-    const needMoreBlocks = () => {
-      moreBlocks = new Promise(resolve=>{gotMoreBlocks=resolve}).then(needMoreBlocks)
-    }
-    needMoreBlocks()
-
     // Continually try to connect to control socket
-    const connect = (backoff = 0) => this.socket = new Promise(async resolve => {
+    await this.connect()
+    // Fetch data
+    await this.mainIndexingLoop()
+  }
+
+  connect (backoff = 0) {
+    return this.socket = new Promise(async resolve => {
       if (backoff > 0) {
         console.log('Waiting for', backoff, 'msec before connecting to socket...')
         await new Promise(resolve=>setTimeout(resolve, backoff))
@@ -192,7 +195,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
 
         socket.addEventListener('close', () => {
           console.log('Disconnected from', this.ws, 'reconnecting...')
-          this.socket = connect(backoff + 250)
+          this.socket = this.connect(backoff + 250)
         })
 
         socket.addEventListener('message', message => {
@@ -202,7 +205,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
             this.latestBlockOnChain = BigInt(block)
             this.latestEpochOnChain = BigInt(epoch)
             if (this.latestBlockOnChain > this.latestBlockInDB) {
-              gotMoreBlocks()
+              this.gotMoreBlocks()
             }
           }
         })
@@ -210,14 +213,18 @@ export class ControllingBlockIndexer extends BlockIndexer {
       } catch (e) {
         console.error(e)
         console.error('Failed to connect to', this.ws, 'retrying in 1s')
-        this.socket = connect(backoff + 250)
+        this.socket = this.connect(backoff + 250)
       }
     })
+  }
 
-    await connect()
-
-    // Main indexing loop that waits for new blocks
+  async mainIndexingLoop () {
+    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
+    // When the node has synced more blocks, it emits a notification via websocket.
+    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
+    // to ingest the new block(s).
     while (true) {
+      await this.updateEpochedData()
       if (this.latestBlockInDB < this.latestBlockOnChain) {
         for (let height = this.latestBlockInDB + 1n; height <= this.latestBlockOnChain; height++) {
           console.debug('Index block', height)
@@ -233,13 +240,15 @@ export class ControllingBlockIndexer extends BlockIndexer {
         await this.updateLatestInDB()
         console.debug('Waiting for more blocks')
         if (await this.isPaused()) await this.resume()
-        await moreBlocks
+        await this.moreBlocks
       } else {
         await this.update()
         if (await this.isPaused()) await this.resume()
       }
     }
+  }
 
+  async updateEpochedData () {
   }
 
   async isPaused () {

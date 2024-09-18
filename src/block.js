@@ -329,15 +329,15 @@ export class ControllingBlockIndexer extends BlockIndexer {
   async updateCounters () {
     // Reset sync if chain is behind database, or more than 2 blocks ahead of database.
     if (this.latestBlockInDB > this.latestBlockOnChain) {
-      this.log.warn('🚨 !!!!!!!!!! DB ahead of chain (block). Restarting from scratch.')
+      this.log.warn(`🚨 !!!!!!!!!! DB ahead of chain (block ${this.latestBlockInDB} > ${this.latestBlockOnChain}). Restarting from scratch.`)
       await this.restart()
       await this.moreBlocks
     } else if (this.latestEpochInDB > this.latestEpochOnChain) {
-      this.log.warn('🚨 !!!!!!!!!! DB ahead of chain (epoch). Restarting from scratch.')
+      this.log.warn(`🚨 !!!!!!!!!! DB ahead of chain (epoch ${this.latestEpochInDB} > ${this.latestEpochOnChain}). Restarting from scratch.`)
       await this.restart()
       await this.moreBlocks
     } else if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      this.log.warn('🚨 !!!!!!!!!! DB more than 2 blocks behind chain. Restarting from scratch.')
+      this.log.warn(`🚨 !!!!!!!!!! DB more than 2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Restarting from scratch.`)
       await this.restart()
       await this.moreBlocks
     }

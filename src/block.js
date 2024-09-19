@@ -129,6 +129,9 @@ export class BlockIndexer {
   }
 
   async updateValidators (epoch) {
+    this.log(
+      "Updating validators at epoch", epoch
+    )
     let validators = 0
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
       this.chain.fetchValidatorsConsensus(epoch),
@@ -140,22 +143,27 @@ export class BlockIndexer {
       addressOnly(previousConsensusValidators),
     )
     for (const address of [...consensusValidators]) {
-      await this.updateValidator(await this.chain.fetchValidator(address), epoch)
+      await this.updateValidator(address, epoch)
       validators++
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `consensus validators`)
     const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
     for (const address of otherValidators) {
       if (!consensusValidators.has(address)) {
-        await this.updateValidator(await this.chain.fetchValidator(address), epoch)
+        await this.updateValidator(address, epoch)
         validators++
       }
     }
     console.log('Epoch', pad(epoch), `updated`, validators, `validators total`)
   }
 
-  async updateValidator (validator, epoch) {
-    console.log("Adding validator", validator.namadaAddress)
+  async updateValidator (address, epoch) {
+    const validator = await this.chain.fetchValidator(address, { epoch })
+    this.log(
+      "Adding validator", validator.namadaAddress,
+      'at epoch', epoch,
+      'with state', validator.state.epoch, '/', validator.state.state
+    )
     await DB.Validator.upsert(Object.assign(validator, { epoch }))
     return { added: true }
   }
@@ -221,7 +229,9 @@ export class ControllingBlockIndexer extends BlockIndexer {
       this.updatePerBlock(),
     ]).then(async ()=>{
       await this.updateCounters()
-      if (await this.isPaused()) await this.resume()
+      if (await this.isPaused()) {
+        await this.resume()
+      }
     })
   }
 

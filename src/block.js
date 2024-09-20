@@ -122,13 +122,8 @@ export class BlockIndexer {
     console.log("=> Added transaction", data.txHash)
   }
 
-  async updateTotalStake (epoch) {
-    this.log("Updating total stake at epoch", epoch)
-    const total = await this.chain.fetchTotalStaked({ epoch })
-    console.log('Epoch', pad(epoch), 'total stake:', total)
-  }
-
   async updateValidators (epoch) {
+    const t0 = performance.now()
     this.log("Updating validators at epoch", epoch)
     let validators = 0
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
@@ -140,19 +135,25 @@ export class BlockIndexer {
       addressOnly(currentConsensusValidators),
       addressOnly(previousConsensusValidators),
     )
-    for (const address of [...consensusValidators]) {
-      await this.updateValidator(address, epoch)
-      validators++
-    }
-    console.log('Epoch', pad(epoch), `updated`, validators, `consensus validators`)
+    await pile({
+      max: 20,
+      inputs: [...consensusValidators],
+      process: address => this.updateValidator(address, epoch).then(()=>validators++)
+    })
+    console.log(
+      'Epoch', pad(epoch), `updated`, validators,
+      `consensus validators in`, performance.now()-t0
+    )
     const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
-    for (const address of otherValidators) {
-      if (!consensusValidators.has(address)) {
-        await this.updateValidator(address, epoch)
-        validators++
-      }
-    }
-    console.log('Epoch', pad(epoch), `updated`, validators, `validators total`)
+    await pile({
+      max: 20,
+      inputs: otherValidators.filter(x=>!consensusValidators.has(x)),
+      process: address => this.updateValidator(address, epoch).then(()=>validators++)
+    })
+    console.log(
+      'Epoch', pad(epoch), `updated`, validators,
+      `validators total in`, performance.now()-t0
+    )
   }
 
   async updateValidator (address, epoch) {
@@ -166,6 +167,31 @@ export class BlockIndexer {
     return { added: true }
   }
 
+  async updateTotalStake (epoch) {
+    this.log("Updating total stake at epoch", epoch)
+    const total = await this.chain.fetchTotalStaked({ epoch })
+    console.log('Epoch', pad(epoch), 'total stake:', total)
+  }
+
+  async updateBondedStake (validator, delegator, epoch) {
+  }
+
+  async updateProposal (id, epoch) {
+  }
+
+}
+
+/** Run up to `max` tasks in parallel. */
+export async function pile ({ max, process, inputs }) {
+  const pile = new Set()
+  while ((inputs.length > 0) || (pile.size > 0)) {
+    while ((pile.size < max) && (inputs.length > 0)) {
+      const task = process(inputs.shift())
+      pile.add(task)
+      task.finally(()=>pile.delete(task))
+    }
+    await Promise.race([...pile])
+  }
 }
 
 /** Polls the chain for new blocks on a given interval. */

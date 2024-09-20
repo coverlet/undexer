@@ -64,6 +64,15 @@ export const StringPrimaryKey = () => ({
   primaryKey: true,
 })
 
+const compoundPrimaryKey = (fields) => Object.fromEntries(
+  Object.entries(fields).map(([key, value])=>[key, {
+    ...value,
+    unique:     false,
+    primaryKey: true,
+    allowNull:  false,
+  }])
+)
+
 import { serialize } from './utils.js'
 
 export const JSONField = name => ({
@@ -136,9 +145,10 @@ export const
   }),
 
   Validator = db.define('validator', {
-    id:                     IntegerPrimaryKey(true),
-    epoch:                  { type: INTEGER },
-    namadaAddress:          { type: TEXT },
+    ...compoundPrimaryKey({
+      epoch:                { type: INTEGER, },
+      namadaAddress:        { type: TEXT, },
+    }),
     publicKey:              { type: TEXT, allowNull: true },
     pastPublicKeys:         NullableJSONField('pastPublicKeys'),
     consensusAddress:       { type: TEXT, allowNull: true },

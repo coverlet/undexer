@@ -128,7 +128,7 @@ export class BlockIndexer {
     let validators = 0
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
       this.chain.fetchValidatorsConsensus(epoch),
-      (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch) : Promise.resolve([])
+      (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch - 1n) : Promise.resolve([])
     ])
     const addressOnly = x => x.map(y=>y.address)
     const consensusValidators = set(
@@ -136,23 +136,23 @@ export class BlockIndexer {
       addressOnly(previousConsensusValidators),
     )
     await pile({
-      max: 20,
-      inputs: [...consensusValidators],
+      max:     30,
+      inputs:  [...consensusValidators],
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
     })
     console.log(
       'Epoch', pad(epoch), `updated`, validators,
-      `consensus validators in`, performance.now()-t0
+      `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's'
     )
     const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
     await pile({
-      max: 20,
-      inputs: otherValidators.filter(x=>!consensusValidators.has(x)),
+      max:     30,
+      inputs:  otherValidators.filter(x=>!consensusValidators.has(x)),
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
     })
     console.log(
       'Epoch', pad(epoch), `updated`, validators,
-      `validators total in`, performance.now()-t0
+      `validators total in`, ((performance.now()-t0)/1000).toFixed(3), 's'
     )
   }
 
@@ -249,16 +249,15 @@ export class ControllingBlockIndexer extends BlockIndexer {
     // Establish current state.
     await this.updateCounters()
     // Fetch data
-    while (true) await this.updateCounters()
-      .then(()=>Promise.all([
-        this.updatePerEpoch(),
-        this.updatePerBlock(),
-      ])).then(async ()=>{
+    while (true) {
+      const t0 = performance.now()
+      await this.updateCounters()
+      await Promise.all([this.updatePerEpoch(), this.updatePerBlock()]).then(async ()=>{
         await this.updateCounters()
-        if (await this.isPaused()) {
-          await this.resume()
-        }
+        if (await this.isPaused()) await this.resume()
       })
+      console.log('Last iteration:', ((performance.now() - t0)/1000).toFixed(3), 's')
+    }
   }
 
   async updatePerEpoch () {
@@ -312,7 +311,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
         this.epochChanged = true
         this.latestEpochOnChain = BigInt(epoch)
         console.log(
-          `Fetched chain epoch:  `,
+          `Epoch on chain: `,
           `${pad(this.latestEpochOnChain)}`,
           `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
         )
@@ -320,7 +319,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
       if (this.latestBlockOnChain != BigInt(block)) {
         this.latestBlockOnChain = BigInt(block)
         console.log(
-          `Fetched chain height: `,
+          `Block on chain: `,
           `${pad(this.latestBlockOnChain)}`,
           `(${pad(this.latestBlockOnChain - this.latestBlockInDB)} behind)`
         )
@@ -337,7 +336,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
       if (this.latestEpochInDB != BigInt(epoch||0)) {
         this.latestEpochInDB = BigInt(epoch||0)
         console.debug(
-          `Queried DB epoch:     `,
+          `Epoch in DB:    `,
           `${pad(this.latestEpochOnChain)}`,
           `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
         )
@@ -345,7 +344,7 @@ export class ControllingBlockIndexer extends BlockIndexer {
       if (this.latestBlockInDB != BigInt(block||0)) {
         this.latestBlockInDB = BigInt(block||0)
         console.debug(
-          `Queried DB height:    `,
+          `Block in DB:    `,
           `${pad(this.latestBlockOnChain)}`,
           `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
         )

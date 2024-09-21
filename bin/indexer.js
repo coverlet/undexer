@@ -23,28 +23,9 @@ events.on("createProposal", updateProposal)
 events.on("updateProposal", updateProposal)
 
 console.log('🚀 Begin indexing!')
-import {
-  BLOCK_POLL,
-  CONTROL_URL,
-  EPOCH_UPDATE_INTERVAL,
-  VALIDATOR_UPDATE_INTERVAL,
-  PROPOSAL_UPDATE_INTERVAL
-} from "../src/config.js"
-import { runForever } from '../src/utils.js'
-import { PollingBlockIndexer, ControllingBlockIndexer } from '../src/block.js'
-import { tryUpdateEpochs } from '../src/epoch.js'
+import { CONTROL_URL } from "../src/config.js"
+import { ControllingBlockIndexer } from '../src/block.js'
 
 console.log('⏳ Connecting...')
 import getRPC from "../src/rpc.js"
-if (BLOCK_POLL) {
-  const chain = await getRPC()
-  await Promise.all([
-    runForever(EPOCH_UPDATE_INTERVAL,     tryUpdateEpochs,     chain),
-    runForever(VALIDATOR_UPDATE_INTERVAL, tryUpdateValidators, chain),
-    runForever(VALIDATOR_UPDATE_INTERVAL, tryUpdateConsensusValidators, chain),
-    runForever(PROPOSAL_UPDATE_INTERVAL,  tryUpdateProposals,  chain),
-    new PollingBlockIndexer({ chain, events }).run()
-  ])
-} else {
-  new ControllingBlockIndexer({ chain: await getRPC(), ws: CONTROL_URL }).run()
-}
+new ControllingBlockIndexer({ chain: await getRPC(), ws: CONTROL_URL }).run()

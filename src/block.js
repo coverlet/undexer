@@ -1,36 +1,255 @@
 //deno-lint-ignore-file no-async-promise-executor
+import EventEmitter from "node:events"
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import * as Query from './query.js'
-import {
-  BLOCK_UPDATE_INTERVAL,
-  GOVERNANCE_TRANSACTIONS,
-  VALIDATOR_TRANSACTIONS,
-  NODE_LOWEST_BLOCK_HEIGHT
-} from './config.js'
-import EventEmitter from "node:events"
+import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, } from './config.js'
 
 const console = new Console('')
 console.debug = () => {}
 
-/** Base block indexer.
- *
- * This class knows about fetching and processing block and transaction data
- * from the chain API. However, listening for new blocks is only implemented
- * in the subclasses. */
-export class BlockIndexer {
+const pad = x => String(x).padEnd(10)
 
-  constructor ({ chain, events }) {
+/** Run up to `max` tasks in parallel. */
+export async function pile ({ max, process, inputs }) {
+  const pile = new Set()
+  while ((inputs.length > 0) || (pile.size > 0)) {
+    while ((pile.size < max) && (inputs.length > 0)) {
+      const task = process(inputs.shift())
+      pile.add(task)
+      task.finally(()=>pile.delete(task))
+    }
+    await Promise.race([...pile])
+  }
+}
+
+/** Connects to a WebSocket that exposes a pausable full node,
+ * and listens for sync progress notifications. */
+export class ControllingBlockIndexer {
+
+  constructor ({ log = console, ws, chain, events }) {
     this.log = console
     this.log.debug = () => {}
+
     this.chain = chain
     this.chain.log.debug = () => {}
     this.chain.connections[0].log.debug = () => {}
+
+    this.ws = ws
     this.events = events || new EventEmitter()
+    this.updater = new Updater({
+      log:    this.log,
+      chain:  this.chain,
+      events: this.events
+    })
+
+    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
+    // When the node has synced more blocks, it emits a notification via websocket.
+    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
+    // to ingest the new block(s).
+    const needMoreBlocks = () => {
+      this.moreBlocks = new Promise(resolve=>{
+        this.gotMoreBlocks = resolve
+      }).then(needMoreBlocks)
+    }
+    needMoreBlocks()
+  }
+
+  latestBlockOnChain = BigInt(0)
+  latestBlockInDB    = BigInt(0)
+  moreBlocks         = new Promise(()=>{/*ignored*/})
+  gotMoreBlocks      = () => {/*ignored*/}
+  needMoreBlocks // set by constructor
+
+  latestEpochOnChain = BigInt(0)
+  latestEpochInDB    = BigInt(0)
+  epochChanged       = false
+
+  async run () {
+    // Continually try to connect to control socket
+    await this.connect()
+    // Fetch data
+    while (true) await this.updateOnce()
+  }
+
+  async updateOnce () {
+    const t0 = performance.now()
+    await this.updateCounters()
+    await Promise.all([this.updatePerEpoch(), this.updatePerBlock()])
+    await this.updateCounters()
+    if (await this.isPaused()) await this.resume()
+    console.log('Last iteration:', ((performance.now() - t0)/1000).toFixed(3), 's')
+  }
+
+  async updatePerEpoch () {
+    await this.updateCounters()
+    if (this.epochChanged) {
+      const epoch = await this.chain.fetchEpoch()
+      await Promise.all([
+        this.updater.updateTotalStake(epoch),
+        this.updater.updateValidators(epoch),
+      ])
+      this.epochChanged = false
+    }
+  }
+
+  async updatePerBlock () {
+    while (true) {
+      await this.updateCounters()
+      if (this.latestBlockInDB >= this.latestBlockOnChain) break
+      while (true) try {
+        await this.updater.updateBlock({ height: this.latestBlockInDB + 1n })
+        break
+      } catch (e) {
+        console.error(e)
+        console.error('Failed to update block', e, 'waiting 1s and retrying...')
+        await new Promise(resolve=>setTimeout(resolve, 1000))
+      }
+    }
+  }
+
+  async updateCounters () {
+    // Reset sync if chain is more than 2 epochs ahead of database.
+    // This is because some data is only stored for 2 epochs' time, then pruned.
+    if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
+      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
+      await this.restart()
+    }
+    // Fetch up-to-date values of counters
+    await Promise.all([this.updateCountersChain(), this.updateCountersDB()])
+  }
+
+  // Current state of chain
+  async updateCountersChain () {
+    return await Promise.all([this.updateChainBlock(), this.updateChainEpoch()])
+  }
+  // Current state of indexed data
+  async updateCountersDB () {
+    return await Promise.all([this.updateDBBlock(), this.updateDBEpoch()])
+  }
+
+  async updateCountersBlock () {
+    return await Promise.all([this.updateDBBlock(), this.updateChainBlock()])
+  }
+
+  async updateChainBlock () {
+    const block = BigInt(await this.chain.fetchHeight())
+    if (this.latestBlockOnChain != block) {
+      const onChain = this.latestBlockOnChain = block
+      const inDB    = this.latestBlockInDB
+      console.log(`Block on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async updateCountersEpoch () {
+    return await Promise.all([this.updateDBEpoch(), this.updateChainEpoch()])
+    if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
+      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
+      await this.restart()
+    }
+  }
+
+  async updateChainEpoch () {
+    const epoch = BigInt(await this.chain.fetchEpoch())
+    if (this.latestEpochOnChain != epoch) {
+      this.epochChanged = true
+      const onChain = this.latestEpochOnChain = epoch
+      const inDB    = this.latestEpochInDB
+      console.log(`Epoch on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async updateDBBlock () {
+    const block = BigInt(await Query.latestBlock()||0)
+    if (this.latestBlockInDB != block) {
+      const inDB    = this.latestBlockInDB = block
+      const onChain = this.latestBlockOnChain
+      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async updateDBEpoch () {
+    const epoch = BigInt(await Query.latestEpoch()||0)
+    if (this.latestEpochInDB != epoch) {
+      const inDB    = this.latestEpochInDB = epoch
+      const onChain = this.latestEpochOnChain
+      console.debug(`Epoch in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async isPaused () {
+    const status = await (await fetch('http://localhost:25555/')).json()
+    return !status.services.proxy
+  }
+
+  async resume () {
+    const socket = await this.socket
+    console.log('Resume sync')
+    socket.send(JSON.stringify({resume:{}}))
+  }
+
+  async restart () {
+    const socket = await this.socket
+    console.log('Restart sync')
+    socket.send(JSON.stringify({restart:{}, resume:{}}))
+  }
+
+  connect (backoff = 0) {
+    return this.socket = new Promise(async resolve => {
+      if (backoff > 0) {
+        console.log('Waiting for', backoff, 'msec before connecting to socket...')
+        await new Promise(resolve=>setTimeout(resolve, backoff))
+      }
+      try {
+        console.log('Connecting to', this.ws)
+        const socket = new WebSocket(this.ws)
+
+        socket.addEventListener('open', () => {
+          console.log('Connected to', this.ws)
+          backoff = 0
+          resolve(socket)
+        })
+
+        socket.addEventListener('close', () => {
+          console.log('Disconnected from', this.ws, 'reconnecting...')
+          this.socket = this.connect(backoff + 250)
+        })
+
+        socket.addEventListener('message', message => {
+          const data = JSON.parse(message.data)
+          if (data.synced) {
+            const {block, epoch} = data.synced
+            this.latestBlockOnChain = BigInt(block)
+            this.latestEpochOnChain = BigInt(epoch)
+            if (this.latestBlockOnChain > this.latestBlockInDB) {
+              this.gotMoreBlocks()
+            }
+          }
+        })
+
+      } catch (e) {
+        console.error(e)
+        console.error('Failed to connect to', this.ws, 'retrying in 1s')
+        this.socket = this.connect(backoff + 250)
+      }
+    })
+  }
+
+}
+
+/** This class knows about fetching and processing block and transaction data
+  * from the chain API. However, listening for new blocks is only implemented
+  * in the subclasses. */
+export class Updater {
+
+  constructor ({ log, chain, events }) {
+    this.log    = log
+    this.chain  = chain
+    this.events = events
   }
 
   /** Update blocks between startHeight and endHeight */
-  async updateBlocks (startHeight, endHeight) {
+  async blocks (startHeight, endHeight) {
     console.log(`Updating blocks ${startHeight}-${endHeight}`)
     let height = startHeight
     try { for (; height <= endHeight; height++) await this.updateBlock({ height }) } catch (e) {
@@ -131,10 +350,10 @@ export class BlockIndexer {
       (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch - 1n) : Promise.resolve([])
     ])
     const addressOnly = x => x.map(y=>y.address)
-    const consensusValidators = set(
-      addressOnly(currentConsensusValidators),
-      addressOnly(previousConsensusValidators),
-    )
+    const consensusValidators = new Set([
+      ...addressOnly(currentConsensusValidators),
+      ...addressOnly(previousConsensusValidators),
+    ])
     await pile({
       max:     30,
       inputs:  [...consensusValidators],
@@ -180,244 +399,3 @@ export class BlockIndexer {
   }
 
 }
-
-/** Run up to `max` tasks in parallel. */
-export async function pile ({ max, process, inputs }) {
-  const pile = new Set()
-  while ((inputs.length > 0) || (pile.size > 0)) {
-    while ((pile.size < max) && (inputs.length > 0)) {
-      const task = process(inputs.shift())
-      pile.add(task)
-      task.finally(()=>pile.delete(task))
-    }
-    await Promise.race([...pile])
-  }
-}
-
-/** Polls the chain for new blocks on a given interval. */
-export class PollingBlockIndexer extends BlockIndexer {
-  run () {
-    return runForever(BLOCK_UPDATE_INTERVAL, this.tryUpdateBlocks.bind(this))
-  }
-  /** Called every `BLOCK_UPDATE_INTERVAL` msec by a `setInterval` in `bin/indexer.js` */
-  async tryUpdateBlocks () {
-    // Setting `NODE_LOWEST_BLOCK_HEIGHT` allows a minimum block to be set
-    const latestBlockInDb = await Query.latestBlock() || Number(NODE_LOWEST_BLOCK_HEIGHT)
-    console.log("=> Latest block in DB:", latestBlockInDb)
-    const latestBlockOnChain = await chain.fetchHeight()
-    console.log("=> Latest block on chain:", latestBlockOnChain)
-    if (latestBlockOnChain > latestBlockInDb) {
-      await this.updateBlocks(latestBlockInDb + 1, latestBlockOnChain)
-    } else {
-      console.info("=> No new blocks")
-    }
-  }
-}
-
-/** Connects to a WebSocket that exposes a pausable full node,
- * and listens for sync progressblock notifications. */
-export class ControllingBlockIndexer extends BlockIndexer {
-
-  constructor ({ ws, ...rest }) {
-    super(rest)
-    this.ws = ws
-    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
-    // When the node has synced more blocks, it emits a notification via websocket.
-    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
-    // to ingest the new block(s).
-    const needMoreBlocks = () => {
-      this.moreBlocks = new Promise(resolve=>{
-        this.gotMoreBlocks = resolve
-      }).then(needMoreBlocks)
-    }
-    needMoreBlocks()
-  }
-
-  latestBlockOnChain = BigInt(0)
-  latestBlockInDB    = BigInt(0)
-  moreBlocks         = new Promise(()=>{/*ignored*/})
-  gotMoreBlocks      = () => {/*ignored*/}
-  needMoreBlocks // set by constructor
-
-  latestEpochOnChain = BigInt(0)
-  latestEpochInDB    = BigInt(0)
-  epochChanged       = false
-
-  async run () {
-    // Continually try to connect to control socket
-    await this.connect()
-    // Establish current state.
-    await this.updateCounters()
-    // Fetch data
-    while (true) {
-      const t0 = performance.now()
-      await this.updateCounters()
-      await Promise.all([this.updatePerEpoch(), this.updatePerBlock()]).then(async ()=>{
-        await this.updateCounters()
-        if (await this.isPaused()) await this.resume()
-      })
-      console.log('Last iteration:', ((performance.now() - t0)/1000).toFixed(3), 's')
-    }
-  }
-
-  async updatePerEpoch () {
-    await this.updateCounters()
-    if (this.epochChanged) {
-      const epoch = await this.chain.fetchEpoch()
-      await Promise.all([
-        this.updateTotalStake(epoch),
-        this.updateValidators(epoch),
-      ])
-      this.epochChanged = false
-    }
-  }
-
-  async updatePerBlock () {
-    while (true) {
-      await this.updateCounters()
-      if (this.latestBlockInDB >= this.latestBlockOnChain) break
-      while (true) try {
-        await this.updateBlock({ height: this.latestBlockInDB + 1n })
-        break
-      } catch (e) {
-        console.error(e)
-        console.error('Failed to update block', e, 'waiting 1s and retrying...')
-        await new Promise(resolve=>setTimeout(resolve, 1000))
-      }
-    }
-  }
-
-  async updateCounters () {
-    // Reset sync if chain is more than 2 epochs ahead of database.
-    // This is because some data is only stored for 2 epochs' time, then pruned.
-    if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
-      await this.restart()
-    }
-    // Fetch up-to-date values of counters
-    await Promise.all([
-      this.updateCountersChain(),
-      this.updateCountersDB()
-    ])
-  }
-
-  // Current state of chain
-  async updateCountersChain () {
-    return await Promise.all([
-      this.chain.fetchHeight(),
-      this.chain.fetchEpoch(),
-    ]).then(([block, epoch])=>{
-      if (this.latestEpochOnChain != BigInt(epoch)) {
-        this.epochChanged = true
-        this.latestEpochOnChain = BigInt(epoch)
-        console.log(
-          `Epoch on chain: `,
-          `${pad(this.latestEpochOnChain)}`,
-          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
-        )
-      }
-      if (this.latestBlockOnChain != BigInt(block)) {
-        this.latestBlockOnChain = BigInt(block)
-        console.log(
-          `Block on chain: `,
-          `${pad(this.latestBlockOnChain)}`,
-          `(${pad(this.latestBlockOnChain - this.latestBlockInDB)} behind)`
-        )
-      }
-    })
-  }
-
-  // Current state of indexed data
-  async updateCountersDB () {
-    return await Promise.all([
-      Query.latestBlock(),
-      Query.latestEpoch(),
-    ]).then(([block, epoch])=>{
-      if (this.latestEpochInDB != BigInt(epoch||0)) {
-        this.latestEpochInDB = BigInt(epoch||0)
-        console.debug(
-          `Epoch in DB:    `,
-          `${pad(this.latestEpochOnChain)}`,
-          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
-        )
-      }
-      if (this.latestBlockInDB != BigInt(block||0)) {
-        this.latestBlockInDB = BigInt(block||0)
-        console.debug(
-          `Block in DB:    `,
-          `${pad(this.latestBlockOnChain)}`,
-          `(${pad(this.latestEpochOnChain - this.latestEpochInDB)} behind)`
-        )
-      }
-    })
-  }
-
-  async isPaused () {
-    const status = await (await fetch('http://localhost:25555/')).json()
-    return !status.services.proxy
-  }
-
-  async resume () {
-    const socket = await this.socket
-    console.log('Resume sync')
-    socket.send(JSON.stringify({resume:{}}))
-  }
-
-  async restart () {
-    const socket = await this.socket
-    console.log('Restart sync')
-    socket.send(JSON.stringify({restart:{}, resume:{}}))
-  }
-
-  connect (backoff = 0) {
-    return this.socket = new Promise(async resolve => {
-      if (backoff > 0) {
-        console.log('Waiting for', backoff, 'msec before connecting to socket...')
-        await new Promise(resolve=>setTimeout(resolve, backoff))
-      }
-      try {
-        console.log('Connecting to', this.ws)
-        const socket = new WebSocket(this.ws)
-
-        socket.addEventListener('open', () => {
-          console.log('Connected to', this.ws)
-          backoff = 0
-          resolve(socket)
-        })
-
-        socket.addEventListener('close', () => {
-          console.log('Disconnected from', this.ws, 'reconnecting...')
-          this.socket = this.connect(backoff + 250)
-        })
-
-        socket.addEventListener('message', message => {
-          const data = JSON.parse(message.data)
-          if (data.synced) {
-            const {block, epoch} = data.synced
-            this.latestBlockOnChain = BigInt(block)
-            this.latestEpochOnChain = BigInt(epoch)
-            if (this.latestBlockOnChain > this.latestBlockInDB) {
-              this.gotMoreBlocks()
-            }
-          }
-        })
-
-      } catch (e) {
-        console.error(e)
-        console.error('Failed to connect to', this.ws, 'retrying in 1s')
-        this.socket = this.connect(backoff + 250)
-      }
-    })
-  }
-
-}
-
-const pad = x => String(x).padEnd(10)
-
-const set = (a, b) => new Set([...a||[], ...b||[]])
-
-const distinct = x => [...new Set(x)]
-
-const stringifier = (_, v) => (typeof v === 'bigint') ? String(v) : v
-
-const appendNonNull = (x, y) => distinct(set(x, [y])).filter(Boolean)

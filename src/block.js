@@ -74,15 +74,13 @@ export class ControllingBlockIndexer {
 
   async updateOnce () {
     const t0 = performance.now()
-    await this.updateCounters()
     await Promise.all([this.updatePerEpoch(), this.updatePerBlock()])
-    await this.updateCounters()
     if (await this.isPaused()) await this.resume()
     console.log('Last iteration:', ((performance.now() - t0)/1000).toFixed(3), 's')
   }
 
   async updatePerEpoch () {
-    await this.updateCounters()
+    await this.updateCountersEpoch()
     if (this.epochChanged) {
       const epoch = await this.chain.fetchEpoch()
       await Promise.all([
@@ -95,7 +93,7 @@ export class ControllingBlockIndexer {
 
   async updatePerBlock () {
     while (true) {
-      await this.updateCounters()
+      await this.updateCountersBlock()
       if (this.latestBlockInDB >= this.latestBlockOnChain) break
       while (true) try {
         await this.updater.updateBlock({ height: this.latestBlockInDB + 1n })
@@ -108,41 +106,8 @@ export class ControllingBlockIndexer {
     }
   }
 
-  async updateCounters () {
-    // Reset sync if chain is more than 2 epochs ahead of database.
-    // This is because some data is only stored for 2 epochs' time, then pruned.
-    if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
-      await this.restart()
-    }
-    // Fetch up-to-date values of counters
-    await Promise.all([this.updateCountersChain(), this.updateCountersDB()])
-  }
-
-  // Current state of chain
-  async updateCountersChain () {
-    return await Promise.all([this.updateChainBlock(), this.updateChainEpoch()])
-  }
-  // Current state of indexed data
-  async updateCountersDB () {
-    return await Promise.all([this.updateDBBlock(), this.updateDBEpoch()])
-  }
-
-  async updateCountersBlock () {
-    return await Promise.all([this.updateDBBlock(), this.updateChainBlock()])
-  }
-
-  async updateChainBlock () {
-    const block = BigInt(await this.chain.fetchHeight())
-    if (this.latestBlockOnChain != block) {
-      const onChain = this.latestBlockOnChain = block
-      const inDB    = this.latestBlockInDB
-      console.log(`Block on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
-    }
-  }
-
   async updateCountersEpoch () {
-    return await Promise.all([this.updateDBEpoch(), this.updateChainEpoch()])
+    await Promise.all([this.updateDBEpoch(), this.updateChainEpoch()])
     if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
       this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
       await this.restart()
@@ -159,21 +124,34 @@ export class ControllingBlockIndexer {
     }
   }
 
-  async updateDBBlock () {
-    const block = BigInt(await Query.latestBlock()||0)
-    if (this.latestBlockInDB != block) {
-      const inDB    = this.latestBlockInDB = block
-      const onChain = this.latestBlockOnChain
-      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
-    }
-  }
-
   async updateDBEpoch () {
     const epoch = BigInt(await Query.latestEpoch()||0)
     if (this.latestEpochInDB != epoch) {
       const inDB    = this.latestEpochInDB = epoch
       const onChain = this.latestEpochOnChain
       console.debug(`Epoch in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async updateCountersBlock () {
+    await Promise.all([this.updateDBBlock(), this.updateChainBlock()])
+  }
+
+  async updateChainBlock () {
+    const block = BigInt(await this.chain.fetchHeight())
+    if (this.latestBlockOnChain != block) {
+      const onChain = this.latestBlockOnChain = block
+      const inDB    = this.latestBlockInDB
+      console.log(`Block on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
+    }
+  }
+
+  async updateDBBlock () {
+    const block = BigInt(await Query.latestBlock()||0)
+    if (this.latestBlockInDB != block) {
+      const inDB    = this.latestBlockInDB = block
+      const onChain = this.latestBlockOnChain
+      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
     }
   }
 

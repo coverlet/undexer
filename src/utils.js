@@ -1,8 +1,36 @@
 import { writeFile } from "node:fs/promises";
 import { base64 } from "@hackbg/fadroma";
 
+export function waitFor (msec) {
+  return new Promise(resolve=>setTimeout(resolve, msec))
+}
+
+export async function runForever (interval, callback) {
+  while (true) {
+    try {
+      await Promise.resolve(callback())
+    } catch (e) {
+      console.error(e)
+    }
+    await waitFor(interval)
+  }
+}
+
+export async function retryForever (interval, callback) {
+  while (true) {
+    try {
+      await Promise.resolve(callback())
+      break
+    } catch (e) {
+      console.error(e)
+      console.info('Retrying in', interval, 'msec')
+      await waitFor(interval)
+    }
+  }
+}
+
 /** Run up to `max` tasks in parallel. */
-export async function pile ({ max, process, inputs }) {
+export async function runParallel ({ max, process, inputs }) {
   const pile = new Set()
   while ((inputs.length > 0) || (pile.size > 0)) {
     while ((pile.size < max) && (inputs.length > 0)) {
@@ -16,11 +44,6 @@ export async function pile ({ max, process, inputs }) {
 
 export function pad (x) {
   return String(x).padEnd(10)
-}
-
-export async function runForever (interval, callback, ...args) {
-  await Promise.resolve(callback(...args))
-  return setTimeout(()=>runForever(interval, callback, ...args), interval)
 }
 
 export function cleanup (data) {
@@ -39,21 +62,6 @@ export function stringifier (key, value) {
     return base64.encode(value);
   }
   return value;
-}
-
-export function waitFor (msec) {
-    return new Promise(resolve=>setTimeout(resolve, msec))
-}
-
-export async function retryForever (operation, interval, callback, ...args) {
-  while (true) {
-    try {
-      return await callback(...args)
-    } catch (e) {
-      console.error(`Failed to ${operation}, waiting ${interval}ms and retrying:`, e)
-      await waitFor(interval)
-    }
-  }
 }
 
 export async function save (path, data) {

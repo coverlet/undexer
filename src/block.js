@@ -4,7 +4,7 @@ import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import * as Query from './query.js'
 import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, } from './config.js'
-import { pad, pile } from './utils.js'
+import { pad, runParallel, runForever, retryForever } from './utils.js'
 
 const console = new Console('')
 console.debug = () => {}
@@ -52,51 +52,56 @@ export class ControllingBlockIndexer {
   epochChanged       = false
 
   async run () {
-    // Continually try to connect to control socket
     await this.connect()
-    // Fetch data
-    while (true) await this.updateOnce()
-  }
-
-  async updateOnce () {
-    const t0 = performance.now()
-    await Promise.all([this.updatePerEpoch(), this.updatePerBlock()])
-    if (await this.isPaused()) await this.resume()
-    console.log('Last iteration:', ((performance.now() - t0)/1000).toFixed(3), 's')
-  }
-
-  async updatePerEpoch () {
-    await this.updateCountersEpoch()
-    if (this.epochChanged) {
-      const epoch = await this.chain.fetchEpoch()
-      await Promise.all([
-        this.updater.updateTotalStake(epoch),
-        this.updater.updateValidators(epoch),
-      ])
-      this.epochChanged = false
-    }
+    runForever(1000, this.updatePerBlock.bind(this))
+    runForever(1000, this.updatePerEpoch.bind(this))
   }
 
   async updatePerBlock () {
-    while (true) {
-      await this.updateCountersBlock()
-      if (this.latestBlockInDB >= this.latestBlockOnChain) break
-      while (true) try {
-        await this.updater.updateBlock({ height: this.latestBlockInDB + 1n })
-        break
-      } catch (e) {
-        console.error(e)
-        console.error('Failed to update block', e, 'waiting 1s and retrying...')
-        await new Promise(resolve=>setTimeout(resolve, 1000))
-      }
+    await Promise.all([
+      retryForever(1000, this.updateDBBlock.bind(this)),
+      retryForever(1000, this.updateChainBlock.bind(this)),
+    ])
+    while (this.latestBlockInDB < this.latestBlockOnChain) {
+      await retryForever(1000, this.updater.updateBlock.bind(this, {
+        height: this.latestBlockInDB + 1n
+      }))
+      await Promise.all([
+        retryForever(1000, this.updateDBBlock.bind(this)),
+        retryForever(1000, this.updateChainBlock.bind(this)),
+      ])
     }
   }
 
-  async updateCountersEpoch () {
-    await Promise.all([this.updateDBEpoch(), this.updateChainEpoch()])
+  async updatePerEpoch () {
+    await Promise.all([
+      retryForever(1000, this.updateDBEpoch.bind(this)),
+      retryForever(1000, this.updateChainEpoch.bind(this)),
+    ])
     if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
       this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
       await this.restart()
+    }
+    if (this.epochChanged) {
+      const epoch = await this.chain.fetchEpoch()
+      await Promise.all([
+        retryForever(1000, this.updater.updateTotalStake.bind(this.updater, epoch)),
+        retryForever(1000, this.updater.updateValidators.bind(this.updater, epoch)),
+        retryForever(1000, this.updater.updateGovernance.bind(this.updater, epoch)),
+      ])
+      this.epochChanged = false
+    }
+    if (await this.isPaused()) {
+      await this.resume()
+    }
+  }
+
+  async updateDBEpoch () {
+    const epoch = BigInt(await Query.latestEpoch()||0)
+    if (this.latestEpochInDB != epoch) {
+      const inDB    = this.latestEpochInDB = epoch
+      const onChain = this.latestEpochOnChain
+      console.debug(`Epoch in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
     }
   }
 
@@ -110,17 +115,13 @@ export class ControllingBlockIndexer {
     }
   }
 
-  async updateDBEpoch () {
-    const epoch = BigInt(await Query.latestEpoch()||0)
-    if (this.latestEpochInDB != epoch) {
-      const inDB    = this.latestEpochInDB = epoch
-      const onChain = this.latestEpochOnChain
-      console.debug(`Epoch in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
+  async updateDBBlock () {
+    const block = BigInt(await Query.latestBlock()||0)
+    if (this.latestBlockInDB != block) {
+      const inDB    = this.latestBlockInDB = block
+      const onChain = this.latestBlockOnChain
+      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
     }
-  }
-
-  async updateCountersBlock () {
-    await Promise.all([this.updateDBBlock(), this.updateChainBlock()])
   }
 
   async updateChainBlock () {
@@ -129,15 +130,6 @@ export class ControllingBlockIndexer {
       const onChain = this.latestBlockOnChain = block
       const inDB    = this.latestBlockInDB
       console.log(`Block on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
-    }
-  }
-
-  async updateDBBlock () {
-    const block = BigInt(await Query.latestBlock()||0)
-    if (this.latestBlockInDB != block) {
-      const inDB    = this.latestBlockInDB = block
-      const onChain = this.latestBlockOnChain
-      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
     }
   }
 
@@ -318,7 +310,7 @@ export class Updater {
       ...addressOnly(currentConsensusValidators),
       ...addressOnly(previousConsensusValidators),
     ])
-    await pile({
+    await runParallel({
       max:     30,
       inputs:  [...consensusValidators],
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
@@ -328,7 +320,7 @@ export class Updater {
       `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's'
     )
     const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
-    await pile({
+    await runParallel({
       max:     30,
       inputs:  otherValidators.filter(x=>!consensusValidators.has(x)),
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
@@ -360,21 +352,23 @@ export class Updater {
     throw new Error('TODO: update bonded stake')
   }
 
-  async updateProposals (epoch) {
-    const proposals = await chain.fetchProposalCount(epoch)
+  async updateGovernance (epoch) {
+    const proposals = await this.chain.fetchProposalCount(epoch)
     console.log('Fetching', proposals, 'proposals, starting from latest')
-    for (let id = proposals - 1n; id >= 0n; id--) {
-      await this.updateProposal(chain, id, epoch)
-    }
+    console.log({inputs})
+    const inputs = Array(proposals).fill(-1).map((_,i)=>i+1).reverse()
+    await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
   }
 
   async updateProposal (id, epoch) {
     console.log('Fetching proposal', id)
+    const response = await this.chain.fetchProposalInfo(id)
+    console.log({id, epoch, response})
     const {
       proposal: { id: _, content, ...metadata },
       votes,
       result,
-    } = await this.chain.fetchProposalInfo(id)
+    } = response
     if (metadata?.type?.ops instanceof Set) {
       metadata.type.ops = [...metadata.type.ops]
     }

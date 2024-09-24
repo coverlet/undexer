@@ -5,5 +5,8 @@
   "exclude": [
     "node_modules",
     "fadroma"
-  ]
+  ],
+  "compilerOptions": {
+    "noImplicitAny": false
+  }
 }

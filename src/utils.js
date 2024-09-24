@@ -1,6 +1,23 @@
 import { writeFile } from "node:fs/promises";
 import { base64 } from "@hackbg/fadroma";
 
+/** Run up to `max` tasks in parallel. */
+export async function pile ({ max, process, inputs }) {
+  const pile = new Set()
+  while ((inputs.length > 0) || (pile.size > 0)) {
+    while ((pile.size < max) && (inputs.length > 0)) {
+      const task = process(inputs.shift())
+      pile.add(task)
+      task.finally(()=>pile.delete(task))
+    }
+    await Promise.race([...pile])
+  }
+}
+
+export function pad (x) {
+  return String(x).padEnd(10)
+}
+
 export async function runForever (interval, callback, ...args) {
   await Promise.resolve(callback(...args))
   return setTimeout(()=>runForever(interval, callback, ...args), interval)

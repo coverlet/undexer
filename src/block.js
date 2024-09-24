@@ -4,24 +4,10 @@ import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import * as Query from './query.js'
 import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, } from './config.js'
+import { pad, pile } from './utils.js'
 
 const console = new Console('')
 console.debug = () => {}
-
-const pad = x => String(x).padEnd(10)
-
-/** Run up to `max` tasks in parallel. */
-export async function pile ({ max, process, inputs }) {
-  const pile = new Set()
-  while ((inputs.length > 0) || (pile.size > 0)) {
-    while ((pile.size < max) && (inputs.length > 0)) {
-      const task = process(inputs.shift())
-      pile.add(task)
-      task.finally(()=>pile.delete(task))
-    }
-    await Promise.race([...pile])
-  }
-}
 
 /** Connects to a WebSocket that exposes a pausable full node,
  * and listens for sync progress notifications. */
@@ -371,9 +357,56 @@ export class Updater {
   }
 
   async updateBondedStake (validator, delegator, epoch) {
+    throw new Error('TODO: update bonded stake')
+  }
+
+  async updateProposals (epoch) {
+    const proposals = await chain.fetchProposalCount(epoch)
+    console.log('Fetching', proposals, 'proposals, starting from latest')
+    for (let id = proposals - 1n; id >= 0n; id--) {
+      await this.updateProposal(chain, id, epoch)
+    }
   }
 
   async updateProposal (id, epoch) {
+    console.log('Fetching proposal', id)
+    const {
+      proposal: { id: _, content, ...metadata },
+      votes,
+      result,
+    } = await this.chain.fetchProposalInfo(id)
+    if (metadata?.type?.ops instanceof Set) {
+      metadata.type.ops = [...metadata.type.ops]
+    }
+    await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
+      console.log('++ Adding proposal', id, 'with', votes.length, 'votes')
+      await DB.Proposal.destroy({ where: { id } }, { transaction: dbTransaction })
+      await DB.Proposal.create({ id, content, metadata, result }, { transaction: dbTransaction })
+      console.log('++ Adding votes for', id, 'count:', votes.length, 'vote(s)')
+      await DB.Vote.destroy({ where: { proposal: id } }, { transaction: dbTransaction })
+      for (const vote of votes) {
+        console.log('++ Adding vote for', id)
+        await DB.Vote.create({ proposal: id, data: vote }, { transaction: dbTransaction })
+      }
+    }), {
+      update: 'proposal',
+      height,
+      epoch,
+      id,
+    })
+    if (metadata.type?.type === 'DefaultWithWasm') {
+      console.log('Fetching WASM for proposal', id)
+      const result = await this.chain.fetchProposalWasm(id)
+      if (result) {
+        const { id, codeKey, wasm } = result
+        await DB.withErrorLog(()=> DB.default.transaction(async dbTransaction => {
+          console.log('++ Adding proposal WASM for', id, 'length:', wasm.length, 'bytes')
+          await DB.ProposalWASM.destroy({ where: { id } }, { transaction: dbTransaction })
+          await DB.ProposalWASM.create({ id, codeKey, wasm }, { transaction: dbTransaction })
+        }))
+      }
+    }
+    console.log('++ Added proposal', id, 'with', votes.length, 'votes')
   }
 
 }

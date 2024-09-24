@@ -55,6 +55,10 @@ export const BLOCK_UPDATE_INTERVAL =
 export const EPOCH_UPDATE_INTERVAL =
   Number(process.env.EPOCH_UPDATE_INTERVAL) || 250
 
+// Don't reset the indexing node from scratch if more than 2 epochs out of sync
+export const ALLOW_INCOMPLETE =
+  Boolean(process.env.ALLOW_INCOMPLETE) || false
+
 export const VALIDATOR_TRANSACTIONS = [
   "tx_become_validator.wasm",
   "tx_change_validator_commission.wasm",

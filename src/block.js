@@ -3,7 +3,7 @@ import EventEmitter from "node:events"
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import * as Query from './query.js'
-import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, } from './config.js'
+import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, ALLOW_INCOMPLETE } from './config.js'
 import { pad, runParallel, runForever, retryForever } from './utils.js'
 
 const console = new Console('')
@@ -63,9 +63,8 @@ export class ControllingBlockIndexer {
       retryForever(1000, this.updateChainBlock.bind(this)),
     ])
     while (this.latestBlockInDB < this.latestBlockOnChain) {
-      await retryForever(1000, this.updater.updateBlock.bind(this, {
-        height: this.latestBlockInDB + 1n
-      }))
+      const height = this.latestBlockInDB + 1n
+      await retryForever(1000, this.updater.updateBlock.bind(this, { height }))
       await Promise.all([
         retryForever(1000, this.updateDBBlock.bind(this)),
         retryForever(1000, this.updateChainBlock.bind(this)),
@@ -79,8 +78,19 @@ export class ControllingBlockIndexer {
       retryForever(1000, this.updateChainEpoch.bind(this)),
     ])
     if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      this.log.warn(`🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, chain ${this.latestEpochOnChain}). Resyncing node from block 1!`)
-      await this.restart()
+      if (ALLOW_INCOMPLETE) {
+        this.log.warn(
+          `DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
+          `chain ${this.latestEpochOnChain}). Historical data may be inaccurate! `+
+          `Run with ALLOW_INCOMPLETE=0 to force resync.`
+        )
+      } else {
+        this.log.warn(
+          `🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
+          `chain ${this.latestEpochOnChain}). Resyncing node from block 1!`
+        )
+        await this.restart()
+      }
     }
     if (this.epochChanged) {
       const epoch = await this.chain.fetchEpoch()
@@ -355,8 +365,8 @@ export class Updater {
   async updateGovernance (epoch) {
     const proposals = await this.chain.fetchProposalCount(epoch)
     console.log('Fetching', proposals, 'proposals, starting from latest')
-    console.log({inputs})
     const inputs = Array(proposals).fill(-1).map((_,i)=>i+1).reverse()
+    console.log({inputs})
     await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
   }
 
@@ -384,7 +394,7 @@ export class Updater {
       }
     }), {
       update: 'proposal',
-      height,
+      //height,
       epoch,
       id,
     })

@@ -64,7 +64,7 @@ export class ControllingBlockIndexer {
     ])
     while (this.latestBlockInDB < this.latestBlockOnChain) {
       const height = this.latestBlockInDB + 1n
-      await retryForever(1000, this.updater.updateBlock.bind(this, { height }))
+      await retryForever(1000, this.updater.updateBlock.bind(this.updater, { height }))
       await Promise.all([
         retryForever(1000, this.updateDBBlock.bind(this)),
         retryForever(1000, this.updateChainBlock.bind(this)),
@@ -321,7 +321,7 @@ export class Updater {
       ...addressOnly(previousConsensusValidators),
     ])
     await runParallel({
-      max:     30,
+      max:     50,
       inputs:  [...consensusValidators],
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
     })
@@ -331,7 +331,7 @@ export class Updater {
     )
     const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
     await runParallel({
-      max:     30,
+      max:     50,
       inputs:  otherValidators.filter(x=>!consensusValidators.has(x)),
       process: address => this.updateValidator(address, epoch).then(()=>validators++)
     })

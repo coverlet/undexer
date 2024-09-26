@@ -71,7 +71,7 @@ export class ControllingBlockIndexer {
       await Promise.all([
         retryForever(1000, this.updater.updateTotalStake.bind(this.updater, epoch)),
         retryForever(1000, this.updater.updateValidators.bind(this.updater, epoch)),
-        retryForever(1000, this.updater.updateGovernance.bind(this.updater, epoch)),
+        //retryForever(1000, this.updater.updateGovernance.bind(this.updater, epoch)),
       ])
       this.epochChanged = false
     }
@@ -151,7 +151,7 @@ export class ControllingBlockIndexer {
         socket.addEventListener('message', message => {
           const data = JSON.parse(message.data)
           if (data.synced) {
-            console.log('Chain sync progress:', JSON.stringify(data.synced))
+            //console.log('Chain sync progress:', JSON.stringify(data.synced))
             //const {block, epoch} = data.synced
             //this.latestBlockOnChain = BigInt(block)
             //this.latestEpochOnChain = BigInt(epoch)
@@ -197,7 +197,7 @@ export class Updater {
     height = block.height
     const [epoch, blockResults] = await Promise.all([
       retryForever(1000, this.chain.fetchEpoch.bind(this.chain, { height })),
-      retryForever(1000, this.chain.fetchBlockResults.bind(this.chain, height)),
+      retryForever(1000, this.chain.fetchBlockResults.bind(this.chain, { height })),
     ])
     this.log.br().log(`Block ${height} (epoch ${epoch})`)
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
@@ -226,11 +226,11 @@ export class Updater {
   /** Update a single transaction in the database. */
   async updateTransaction ({ epoch, height, blockResults, transaction, dbTransaction, }) {
     this.log(
-      `Block ${height} (epoch ${epoch}) `,
+      `Block ${height} (epoch ${epoch})`,
       `TX ${transaction.data.content?.type}`, transaction.id
     )
     const { type: txType, data: txData } = transaction.data?.content || {}
-    if (txType) switch (txContent.type) {
+    if (txType) switch (txType) {
       case "tx_activate_validator.wasm":
       case "tx_add_validator.wasm":
       case "tx_become_validator.wasm":
@@ -242,14 +242,14 @@ export class Updater {
       case "tx_reactivate_validator.wasm":
       case "tx_remove_validator.wasm":
       case "tx_unjail_validator.wasm": {
-        console.log(`Block ${height} (epoch ${epoch}): Updating validator`, txContent.data.validator)
-        this.updateValidator(txContent.data.validator, epoch)
+        console.log(`Block ${height} (epoch ${epoch}): Updating validator`, txData.validator)
+        this.updateValidator(txData.validator, epoch)
         break
       }
       case "tx_init_proposal.wasm": {
         const initTx = transaction.id
-        const { content, ...metadata } = content.data || {}
-        const id = findProposalId(blockResults.endBlockEvents)
+        const { content, ...metadata } = txData || {}
+        const id = findProposalId(blockResults.endBlockEvents, transaction.id)
         if (id) {
           console.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
           await DB.Proposal.create({id, content, metadata, initTx}, {transaction: dbTransaction})
@@ -261,10 +261,10 @@ export class Updater {
       }
       case "tx_vote_proposal.wasm": {
         console.log(`Block ${height} (epoch ${epoch}): Vote`)
-        console.log(content)
+        console.log(txData)
         await waitForever()
-        const { id, content, ...metadata } = content.data || {}
-        console.log('Updating proposal', proposal, 'at epoch', epoch)
+        const { id, content, ...metadata } = txData || {}
+        console.log(`Block ${height} (epoch ${epoch}): Vote on proposal`, id)
         this.updateProposal(id, epoch)
         break
       }
@@ -391,18 +391,17 @@ export class Updater {
         }))
       }
     }
-    console.log(`Epoch ${epoch}: added proposal ${id} with ${votes.length} votes`)
+    console.log(`Epoch ${epoch} added proposal ${id} with ${votes.length} votes`)
   }
 
 }
 
-function findProposalId (endBlockEvents) {
-  let found = null
-  for (const [ type, attributes ] of Object.entries(endBlockEvents)) {
+function findProposalId (endBlockEvents, txHash) {
+  for (const { type, attributes } of endBlockEvents) {
     if (type === 'tx/applied') {
-      for (const [ key, value ] of Object.entries(attributes)) {
-        if (key === 'hash' && value === transaction.id) {
-          for (const [ key, value ] of Object.entries(attributes)) {
+      for (const { key, value } of attributes) {
+        if (key === 'hash' && value === txHash) {
+          for (const { key, value } of attributes) {
             if (key === 'batch') {
               const batch = JSON.parse(value)
               const { Ok } = Object.values(batch)[0] || {}
@@ -410,19 +409,16 @@ function findProposalId (endBlockEvents) {
                 const { events } = Ok
                 for (const event of events) {
                   if (event.event_type?.inner === 'governance/proposal/new') {
-                    found = attributes.proposal_id
-                    break
+                    console.log({ found: event.attributes.proposal_id })
+                    return event.attributes.proposal_id
                   }
                 }
               }
             }
-            if (found !== null) break
           }
         }
-        if (found !== null) break
       }
     }
-    if (found !== null) break
   }
-  return found
+  return null
 }

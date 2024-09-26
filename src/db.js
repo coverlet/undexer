@@ -193,9 +193,12 @@ export const
   }),
 
   Vote = db.define("vote", {
-    id:       IntegerPrimaryKey(true),
-    proposal: { type: INTEGER },
-    data:     JSONField('data'),
+    ...compoundPrimaryKey({
+      proposal: { type: INTEGER, },
+      voter:    { type: TEXT, },
+    }),
+    vote:       { type: TEXT, },
+    voteTx:     { type: TEXT, allowNull: true }
   });
 
 export function logErrorToDB (error, info) {

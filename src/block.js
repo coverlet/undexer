@@ -247,12 +247,16 @@ export class Updater {
         break
       }
       case "tx_init_proposal.wasm": {
-        const initTx = transaction.id
         const { content, ...metadata } = txData || {}
         const id = findProposalId(blockResults.endBlockEvents, transaction.id)
         if (id) {
           console.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
-          await DB.Proposal.create({id, content, metadata, initTx}, {transaction: dbTransaction})
+          await DB.Proposal.upsert({
+            id,
+            content,
+            metadata,
+            initTx: transaction.id
+          }, {transaction: dbTransaction})
         } else {
           console.log(`Block ${height} (epoch ${epoch}): New proposal, unknown id, updating all`)
           await this.updateGovernance()
@@ -260,12 +264,13 @@ export class Updater {
         break
       }
       case "tx_vote_proposal.wasm": {
-        console.log(`Block ${height} (epoch ${epoch}): Vote`)
-        console.log(txData)
-        await waitForever()
-        const { id, content, ...metadata } = txData || {}
-        console.log(`Block ${height} (epoch ${epoch}): Vote on proposal`, id)
-        this.updateProposal(id, epoch)
+        console.log(`Block ${height} (epoch ${epoch}) Vote on`, txData.id, 'by', txData.voter)
+        await DB.Vote.upsert({
+          proposal: txData.id,
+          voter:    txData.voter,
+          vote:     txData.vote,
+          voteTx:   transaction.id,
+        }, {transaction: dbTransaction})
         break
       }
     } else {

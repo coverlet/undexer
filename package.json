@@ -20,8 +20,8 @@
     "@ganesha/esbuild-wasm": "workspace:1.0.0-rc.2",
     "@hackbg/cmds": "workspace:./fadroma/toolbox/cmds",
     "@hackbg/fadroma": "workspace:./fadroma",
-    "@hackbg/logs": "workspace:^",
     "@hackbg/into": "workspace:^",
+    "@hackbg/logs": "workspace:^",
     "borsh": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -32,6 +32,7 @@
     "undici": "^6.19.2"
   },
   "devDependencies": {
+    "@types/node": "^22.7.0",
     "concurrently": "7.2.2",
     "tsx": "^4.15.6"
   }

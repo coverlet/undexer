@@ -29,7 +29,7 @@ Requires:
 * Rust (tested with 1.79.0)
 * wasm-pack (tested with 0.12.1)
 * protoc (tested with 25.3)
-* PostgreSQL (tested wit 16.2)
+* PostgreSQL (tested with 16.2)
 
 Setup:
 

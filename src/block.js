@@ -3,8 +3,8 @@ import EventEmitter from "node:events"
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import * as Query from './query.js'
-import { GOVERNANCE_TRANSACTIONS, VALIDATOR_TRANSACTIONS, ALLOW_INCOMPLETE } from './config.js'
-import { pad, runParallel, runForever, retryForever } from './utils.js'
+import { START_BLOCK, ALLOW_INCOMPLETE } from './config.js'
+import { pad, runParallel, runForever, retryForever, waitForever, maxBigInt } from './utils.js'
 
 const console = new Console('')
 console.debug = () => {}
@@ -33,19 +33,19 @@ export class ControllingBlockIndexer {
     // When the node has synced more blocks, it emits a notification via websocket.
     // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
     // to ingest the new block(s).
-    const needMoreBlocks = () => {
-      this.moreBlocks = new Promise(resolve=>{
-        this.gotMoreBlocks = resolve
-      }).then(needMoreBlocks)
-    }
-    needMoreBlocks()
+    //const needMoreBlocks = () => {
+      //this.moreBlocks = new Promise(resolve=>{
+        //this.gotMoreBlocks = resolve
+      //}).then(needMoreBlocks)
+    //}
+    //needMoreBlocks()
   }
 
   latestBlockOnChain = BigInt(0)
-  latestBlockInDB    = BigInt(0)
-  moreBlocks         = new Promise(()=>{/*ignored*/})
-  gotMoreBlocks      = () => {/*ignored*/}
-  needMoreBlocks // set by constructor
+  latestBlockInDB    = BigInt(0 || START_BLOCK)
+  //moreBlocks         = new Promise(()=>{[>ignored<]})
+  //gotMoreBlocks      = () => {[>ignored<]}
+  //needMoreBlocks // set by constructor
 
   latestEpochOnChain = BigInt(0)
   latestEpochInDB    = BigInt(0)
@@ -53,45 +53,34 @@ export class ControllingBlockIndexer {
 
   async run () {
     await this.connect()
+    this.log('Connected. Starting from block', this.latestBlockInDB)
     runForever(1000, this.updatePerBlock.bind(this))
     runForever(1000, this.updatePerEpoch.bind(this))
   }
 
   async updatePerBlock () {
-    await Promise.all([
-      retryForever(1000, this.updateDBBlock.bind(this)),
-      retryForever(1000, this.updateChainBlock.bind(this)),
-    ])
+    await this.updateBlockCounter()
     while (this.latestBlockInDB < this.latestBlockOnChain) {
       const height = this.latestBlockInDB + 1n
       await retryForever(1000, this.updater.updateBlock.bind(this.updater, { height }))
-      await Promise.all([
-        retryForever(1000, this.updateDBBlock.bind(this)),
-        retryForever(1000, this.updateChainBlock.bind(this)),
-      ])
+      await this.updateBlockCounter()
     }
   }
 
-  async updatePerEpoch () {
-    await Promise.all([
-      retryForever(1000, this.updateDBEpoch.bind(this)),
-      retryForever(1000, this.updateChainEpoch.bind(this)),
+  async updateBlockCounter () {
+    const [inDB, onChain] = await Promise.all([
+      retryForever(1000, async () => {
+        return this.latestBlockInDB = maxBigInt(START_BLOCK, BigInt(await Query.latestBlock()||0))
+      }),
+      retryForever(1000, async () => {
+        return this.latestBlockOnChain = await this.chain.fetchHeight()
+      }),
     ])
-    if (this.latestEpochInDB < this.latestEpochOnChain - 2n) {
-      if (ALLOW_INCOMPLETE) {
-        this.log.warn(
-          `DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
-          `chain ${this.latestEpochOnChain}). Historical data may be inaccurate! `+
-          `Run with ALLOW_INCOMPLETE=0 to force resync.`
-        )
-      } else {
-        this.log.warn(
-          `🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
-          `chain ${this.latestEpochOnChain}). Resyncing node from block 1!`
-        )
-        await this.restart()
-      }
-    }
+    console.log(`Block ${inDB}/${onChain} (${(onChain - inDB)} behind)`)
+  }
+
+  async updatePerEpoch () {
+    await this.updateEpochCounter()
     if (this.epochChanged) {
       const epoch = await this.chain.fetchEpoch()
       await Promise.all([
@@ -106,40 +95,33 @@ export class ControllingBlockIndexer {
     }
   }
 
-  async updateDBEpoch () {
-    const epoch = BigInt(await Query.latestEpoch()||0)
-    if (this.latestEpochInDB != epoch) {
-      const inDB    = this.latestEpochInDB = epoch
-      const onChain = this.latestEpochOnChain
-      console.debug(`Epoch in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
-    }
-  }
-
-  async updateChainEpoch () {
-    const epoch = BigInt(await this.chain.fetchEpoch())
-    if (this.latestEpochOnChain != epoch) {
+  async updateEpochCounter () {
+    const [onChain, inDB] = await Promise.all([
+      retryForever(1000, async () => {
+        return this.latestEpochOnChain = BigInt(await this.chain.fetchEpoch())
+      }),
+      retryForever(1000, async () => {
+        return this.latestEpochInDB    = BigInt(await Query.latestEpoch()||0)
+      }),
+    ])
+    if (onChain != inDB) {
       this.epochChanged = true
-      const onChain = this.latestEpochOnChain = epoch
-      const inDB    = this.latestEpochInDB
-      console.log(`Epoch on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
+      console.debug(`Epoch ${inDB}/${onChain}`)
     }
-  }
-
-  async updateDBBlock () {
-    const block = BigInt(await Query.latestBlock()||0)
-    if (this.latestBlockInDB != block) {
-      const inDB    = this.latestBlockInDB = block
-      const onChain = this.latestBlockOnChain
-      console.debug(`Block in DB:   ${pad(inDB)}    (${pad(onChain - inDB)} behind)`)
-    }
-  }
-
-  async updateChainBlock () {
-    const block = BigInt(await this.chain.fetchHeight())
-    if (this.latestBlockOnChain != block) {
-      const onChain = this.latestBlockOnChain = block
-      const inDB    = this.latestBlockInDB
-      console.log(`Block on chain:  ${pad(onChain)} (${pad(onChain - inDB)} behind)`)
+    if (inDB < onChain - 2n) {
+      if (ALLOW_INCOMPLETE) {
+        this.log.warn(
+          `DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
+          `chain ${this.latestEpochOnChain}). Historical data may be inaccurate! `+
+          `Run with ALLOW_INCOMPLETE=0 to force resync.`
+        )
+      } else {
+        this.log.warn(
+          `🚨🚨🚨 DB is >2 epochs behind chain (DB ${this.latestEpochInDB}, `+
+          `chain ${this.latestEpochOnChain}). Resyncing node from block 1!`
+        )
+        await this.restart()
+      }
     }
   }
 
@@ -184,12 +166,13 @@ export class ControllingBlockIndexer {
         socket.addEventListener('message', message => {
           const data = JSON.parse(message.data)
           if (data.synced) {
-            const {block, epoch} = data.synced
-            this.latestBlockOnChain = BigInt(block)
-            this.latestEpochOnChain = BigInt(epoch)
-            if (this.latestBlockOnChain > this.latestBlockInDB) {
-              this.gotMoreBlocks()
-            }
+            console.log('Chain sync progress:', JSON.stringify(data.synced))
+            //const {block, epoch} = data.synced
+            //this.latestBlockOnChain = BigInt(block)
+            //this.latestEpochOnChain = BigInt(epoch)
+            //if (this.latestBlockOnChain > this.latestBlockInDB) {
+              //this.gotMoreBlocks()
+            //}
           }
         })
 
@@ -214,16 +197,6 @@ export class Updater {
     this.events = events
   }
 
-  /** Update blocks between startHeight and endHeight */
-  async blocks (startHeight, endHeight) {
-    console.log(`Updating blocks ${startHeight}-${endHeight}`)
-    let height = startHeight
-    try { for (; height <= endHeight; height++) await this.updateBlock({ height }) } catch (e) {
-      console.error('Failed to index block', height)
-      console.error(e)
-    }
-  }
-
   /** Update a single block in the database. */
   async updateBlock ({ height, block }) {
     const t0 = performance.now()
@@ -237,6 +210,7 @@ export class Updater {
     }
     // Make sure there isn't a mismatch between required and actual height
     height = block.height
+    const epoch = await retryForever(1000, this.chain.fetchEpoch.bind(this.chain, { height }))
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
       const data = {
         chainId:      block.header.chainId,
@@ -247,15 +221,12 @@ export class Updater {
         blockData:    JSON.parse(block.responses?.block.response||"null"),
         blockResults: JSON.parse(block.responses?.results?.response||"null"),
         rpcResponses: block.responses,
-        epoch:        await this.chain.fetchEpoch({ height }).catch(()=>{
-          this.log.warn('Could not fetch epoch for block', height, '- will retry later')
-          return undefined
-        }),
+        epoch,
       }
       await DB.Block.upsert(data, { transaction: dbTransaction })
       // Update transactions from block:
       for (const transaction of block.transactions) {
-        await this.updateTransaction({ height, transaction, dbTransaction })
+        await this.updateTransaction({ epoch, height, transaction, dbTransaction })
       }
     }), { update: 'block', height })
     // Log performed updates.
@@ -266,33 +237,36 @@ export class Updater {
   }
 
   /** Update a single transaction in the database. */
-  async updateTransaction ({ height, transaction, dbTransaction, }) {
-    const console = new Console(`Block ${height}, TX ${transaction.id.slice(0, 8)}`)
+  async updateTransaction ({ epoch, height, transaction, dbTransaction, }) {
+    this.log(
+      `TX ${transaction.data.content?.type}`,
+      `at ${height} (epoch ${epoch}): ${transaction.data.txHash}`
+    )
     const { content, /*sections*/ } = transaction.data
     if (content) {
-      console.log("TX content:", content.type)
-      const uploadData = { ...content }
-      if (GOVERNANCE_TRANSACTIONS.includes(uploadData.type)) {
-        uploadData.data.proposalId = Number(uploadData.data.id)
-        delete uploadData.data.id
-      }
       // Emit events based on tx content
-      if (VALIDATOR_TRANSACTIONS.includes(content.type)) {
-        this.events?.emit("updateValidators", height)
-      }
-      if (content.type === "transaction_vote_proposal.wasm") {
-        this.events?.emit("updateProposal", content.data.proposalId, height)
-      }
-      if (content.type === "transaction_init_proposal.wasm") {
-        this.events?.emit("createProposal", content.data, height)
+      switch (content.type) {
+        case "tx_activate_validator.wasm":
+        case "tx_add_validator.wasm":
+        case "tx_become_validator.wasm":
+        case "tx_bond.wasm":
+        case "tx_change_validator_commission.wasm":
+        case "tx_change_validator_metadata.wasm":
+        case "tx_change_validator_power.wasm":
+        case "tx_deactivate_validator.wasm":
+        case "tx_reactivate_validator.wasm":
+        case "tx_remove_validator.wasm":
+        case "tx_unjail_validator.wasm":
+          this.updateValidator(validator, epoch)
+          break
+        case "tx_init_proposal.wasm":
+        case "tx_vote_proposal.wasm":
+          this.updateProposal(proposal, epoch)
+          break
       }
     } else {
       console.warn("No supported TX content in", transaction.id)
     }
-    // Log transaction section types.
-    //for (const section of sections) {
-      //console.debug("=> Add section", section.type)
-    //}
     const data = {
       chainId:     transaction.data.chainId,
       blockHash:   transaction.block.hash,
@@ -300,17 +274,17 @@ export class Updater {
       blockHeight: transaction.block.height,
       txHash:      transaction.id,
       txTime:      transaction.data.timestamp,
-      txData:      transaction,
+      txType:      transaction.data.content?.type,
+      txContent:   transaction.data.content?.data,
+      txData:      transaction, // TODO deprecate
     }
-    //console.debug("=> Adding transaction", data)
     await DB.Transaction.upsert(data, { transaction: dbTransaction })
-    console.log("=> Added transaction", data.txHash)
   }
 
   async updateValidators (epoch) {
     const t0 = performance.now()
     this.log("Updating validators at epoch", epoch)
-    let validators = 0
+    let validatorCount = 0
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
       this.chain.fetchValidatorsConsensus(epoch),
       (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch - 1n) : Promise.resolve([])
@@ -323,31 +297,32 @@ export class Updater {
     await runParallel({
       max:     50,
       inputs:  [...consensusValidators],
-      process: address => this.updateValidator(address, epoch).then(()=>validators++)
+      process: address => this.updateValidator(address, epoch).then(()=>validatorCount++)
     })
     console.log(
-      'Epoch', pad(epoch), `updated`, validators,
+      'Epoch', pad(epoch), `updated`, validatorCount,
       `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's'
     )
-    const otherValidators = await this.chain.fetchValidatorAddresses(epoch)
+    const validators = await this.chain.fetchValidatorAddresses(epoch)
+    const otherValidators = validators.filter(x=>!consensusValidators.has(x))
     await runParallel({
       max:     50,
-      inputs:  otherValidators.filter(x=>!consensusValidators.has(x)),
-      process: address => this.updateValidator(address, epoch).then(()=>validators++)
+      inputs:  otherValidators,
+      process: address => this.updateValidator(address, epoch).then(()=>validatorCount++)
     })
     console.log(
-      'Epoch', pad(epoch), `updated`, validators,
+      'Epoch', pad(epoch), `updated`, validatorCount,
       `validators total in`, ((performance.now()-t0)/1000).toFixed(3), 's'
     )
   }
 
   async updateValidator (address, epoch) {
     const validator = await this.chain.fetchValidator(address, { epoch })
-    this.log(
-      "Adding validator", validator.namadaAddress,
-      'at epoch', epoch,
-      'with state', validator.state.epoch, '/', validator.state.state
-    )
+    //this.log(
+      //"Epoch", epoch,
+      //"add validator", validator.namadaAddress,
+      //"with state", validator.state.state
+    //)
     await DB.Validator.upsert(Object.assign(validator, { epoch }))
     return { added: true }
   }
@@ -365,31 +340,31 @@ export class Updater {
   async updateGovernance (epoch) {
     const proposals = await this.chain.fetchProposalCount(epoch)
     console.log('Fetching', proposals, 'proposals, starting from latest')
-    const inputs = Array(proposals).fill(-1).map((_,i)=>i+1).reverse()
-    console.log({inputs})
+    const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
     await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
   }
 
   async updateProposal (id, epoch) {
     console.log('Fetching proposal', id)
-    const response = await this.chain.fetchProposalInfo(id)
-    console.log({id, epoch, response})
-    const {
-      proposal: { id: _, content, ...metadata },
-      votes,
-      result,
-    } = response
-    if (metadata?.type?.ops instanceof Set) {
-      metadata.type.ops = [...metadata.type.ops]
-    }
+    const [proposal, votes, result] = await Promise.all([
+      this.chain.fetchProposalInfo(id),
+      this.chain.fetchProposalVotes(id),
+      this.chain.fetchProposalResult(id),
+    ])
+    const { id: _, content, ...metadata } = proposal
+    if (metadata?.type?.ops instanceof Set) metadata.type.ops = [...metadata.type.ops]
+    console.log({id, votes})
+    //if (votes.length > 0) {
+      //await waitForever()
+    //}
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
-      console.log('++ Adding proposal', id, 'with', votes.length, 'votes')
+      console.log('Adding proposal', id, 'with', votes.length, 'votes')
       await DB.Proposal.destroy({ where: { id } }, { transaction: dbTransaction })
       await DB.Proposal.create({ id, content, metadata, result }, { transaction: dbTransaction })
-      console.log('++ Adding votes for', id, 'count:', votes.length, 'vote(s)')
+      console.log('Adding votes for', id, 'count:', votes.length, 'vote(s)')
       await DB.Vote.destroy({ where: { proposal: id } }, { transaction: dbTransaction })
       for (const vote of votes) {
-        console.log('++ Adding vote for', id)
+        console.log('Adding vote for', id)
         await DB.Vote.create({ proposal: id, data: vote }, { transaction: dbTransaction })
       }
     }), {
@@ -410,7 +385,7 @@ export class Updater {
         }))
       }
     }
-    console.log('++ Added proposal', id, 'with', votes.length, 'votes')
+    console.log(`Epoch ${epoch}: added proposal ${id} with ${votes.length} votes`)
   }
 
 }

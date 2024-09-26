@@ -5,6 +5,10 @@ export function waitFor (msec) {
   return new Promise(resolve=>setTimeout(resolve, msec))
 }
 
+export function waitForever () {
+  return new Promise(_=>console.warn('Debug mode. Pausing until manual intervention.'))
+}
+
 export async function runForever (interval, callback) {
   while (true) {
     try {
@@ -19,8 +23,8 @@ export async function runForever (interval, callback) {
 export async function retryForever (interval, callback) {
   while (true) {
     try {
-      await Promise.resolve(callback())
-      break
+      const result = await Promise.resolve(callback())
+      return result
     } catch (e) {
       console.error(e)
       console.info('Retrying in', interval, 'msec')
@@ -40,6 +44,12 @@ export async function runParallel ({ max, process, inputs }) {
     }
     await Promise.race([...pile])
   }
+}
+
+export function maxBigInt (x, y) {
+  x = BigInt(x)
+  y = BigInt(y)
+  return (x > y) ? x : y
 }
 
 export function pad (x) {

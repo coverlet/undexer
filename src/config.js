@@ -30,9 +30,6 @@ export const PRE_UNDEXER_RPC_URL =
 export const POST_UNDEXER_RPC_URL =
   process.env.POST_UNDEXER_RPC_URL || RPC_URL;
 
-export const START_FROM_SCRATCH =
-  process.env.START_FROM_SCRATCH || false;
-
 export const UNDEXER_API_URL = 
   process.env.UNDEXER_API_URL || "http://v2.namada.undexer.demo.hack.bg";
 
@@ -59,21 +56,12 @@ export const EPOCH_UPDATE_INTERVAL =
 export const ALLOW_INCOMPLETE =
   Boolean(process.env.ALLOW_INCOMPLETE) || false
 
-export const VALIDATOR_TRANSACTIONS = [
-  "tx_become_validator.wasm",
-  "tx_change_validator_commission.wasm",
-  "tx_change_validator_metadata.wasm",
-  "tx_deactivate_validator.wasm",
-  "tx_activate_validator.wasm",
-  "tx_remove_validator.wasm",
-  "tx_add_validator.wasm",
-  "tx_change_validator_power.wasm",
-  "tx_change_validator_commission.wasm",
-  "tx_deactivate_validator.wasm",
-  "tx_reactivate_validator.wasm",
-  "tx_unjail_validator.wasm",
-  "tx_bond.wasm",
-]
+// Start indexing from this block
+export const START_BLOCK =
+  BigInt(process.env.START_BLOCK || 1)
+
+export const START_FROM_SCRATCH =
+  process.env.START_FROM_SCRATCH || false;
 
 export const GOVERNANCE_TRANSACTIONS = [
   "tx_vote_proposal.wasm",
@@ -128,7 +116,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     POST_UNDEXER_RPC_URL,
     DATABASE_URL,
     NODE_LOWEST_BLOCK_HEIGHT,
-    START_FROM_SCRATCH,
     UNDEXER_API_URL,
     VALIDATOR_UPDATE_INTERVAL,
     PROPOSAL_UPDATE_INTERVAL,
@@ -136,8 +123,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     VALIDATOR_NAMADA_METADATA_PARALLEL,
     BLOCK_UPDATE_INTERVAL,
     EPOCH_UPDATE_INTERVAL,
-    VALIDATOR_TRANSACTIONS,
     GOVERNANCE_TRANSACTIONS,
     TOKENS,
+    START_BLOCK,
+    START_FROM_SCRATCH
   })
 }

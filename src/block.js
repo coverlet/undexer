@@ -28,25 +28,10 @@ export class ControllingBlockIndexer {
       chain:  this.chain,
       events: this.events
     })
-
-    // Auto-renewing lock. The main loop waits for it when there are no new blocks.
-    // When the node has synced more blocks, it emits a notification via websocket.
-    // The socket handler below calls gotMoreBlocks to unlock this, allowing the main loop
-    // to ingest the new block(s).
-    //const needMoreBlocks = () => {
-      //this.moreBlocks = new Promise(resolve=>{
-        //this.gotMoreBlocks = resolve
-      //}).then(needMoreBlocks)
-    //}
-    //needMoreBlocks()
   }
 
   latestBlockOnChain = BigInt(0)
   latestBlockInDB    = BigInt(0 || START_BLOCK)
-  //moreBlocks         = new Promise(()=>{[>ignored<]})
-  //gotMoreBlocks      = () => {[>ignored<]}
-  //needMoreBlocks // set by constructor
-
   latestEpochOnChain = BigInt(0)
   latestEpochInDB    = BigInt(0)
   epochChanged       = false
@@ -76,7 +61,7 @@ export class ControllingBlockIndexer {
         return this.latestBlockOnChain = await this.chain.fetchHeight()
       }),
     ])
-    console.log(`Block ${inDB}/${onChain} (${(onChain - inDB)} behind)`)
+    console.log(`Block ${inDB} of ${onChain} (${(onChain - inDB)} behind)`)
   }
 
   async updatePerEpoch () {
@@ -106,7 +91,7 @@ export class ControllingBlockIndexer {
     ])
     if (onChain != inDB) {
       this.epochChanged = true
-      console.debug(`Epoch ${inDB}/${onChain}`)
+      console.br().log(`Epoch ${inDB} of ${onChain}`)
     }
     if (inDB < onChain - 2n) {
       if (ALLOW_INCOMPLETE) {
@@ -210,9 +195,14 @@ export class Updater {
     }
     // Make sure there isn't a mismatch between required and actual height
     height = block.height
-    const epoch = await retryForever(1000, this.chain.fetchEpoch.bind(this.chain, { height }))
+    const [epoch, blockResults] = await Promise.all([
+      retryForever(1000, this.chain.fetchEpoch.bind(this.chain, { height })),
+      retryForever(1000, this.chain.fetchBlockResults.bind(this.chain, height)),
+    ])
+    this.log.br().log(`Block ${height} (epoch ${epoch})`)
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
-      const data = {
+      // Update block record
+      await DB.Block.upsert({
         chainId:      block.header.chainId,
         blockTime:    block.time,
         blockHeight:  block.height,
@@ -222,63 +212,76 @@ export class Updater {
         blockResults: JSON.parse(block.responses?.results?.response||"null"),
         rpcResponses: block.responses,
         epoch,
-      }
-      await DB.Block.upsert(data, { transaction: dbTransaction })
-      // Update transactions from block:
-      for (const transaction of block.transactions) {
-        await this.updateTransaction({ epoch, height, transaction, dbTransaction })
-      }
+      }, { transaction: dbTransaction })
+      // Update transaction records from block
+      for (const transaction of block.transactions) await this.updateTransaction({
+        epoch, height, blockResults, transaction, dbTransaction
+      })
     }), { update: 'block', height })
     // Log performed updates.
     const t = performance.now() - t0
-    for (const {id} of block.transactions) this.log.log("Block", height, "TX", id)
-    this.log.log("Added block", height, 'in', t.toFixed(0), 'msec')
-    //this.log.br()
+    this.log(`Block ${height} (epoch ${epoch}): added in`, t.toFixed(0), 'msec')
   }
 
   /** Update a single transaction in the database. */
-  async updateTransaction ({ epoch, height, transaction, dbTransaction, }) {
+  async updateTransaction ({ epoch, height, blockResults, transaction, dbTransaction, }) {
     this.log(
-      `TX ${transaction.data.content?.type}`,
-      `at ${height} (epoch ${epoch}): ${transaction.data.txHash}`
+      `Block ${height} (epoch ${epoch}) `,
+      `TX ${transaction.data.content?.type}`, transaction.id
     )
-    const { content, /*sections*/ } = transaction.data
-    if (content) {
-      // Emit events based on tx content
-      switch (content.type) {
-        case "tx_activate_validator.wasm":
-        case "tx_add_validator.wasm":
-        case "tx_become_validator.wasm":
-        case "tx_bond.wasm":
-        case "tx_change_validator_commission.wasm":
-        case "tx_change_validator_metadata.wasm":
-        case "tx_change_validator_power.wasm":
-        case "tx_deactivate_validator.wasm":
-        case "tx_reactivate_validator.wasm":
-        case "tx_remove_validator.wasm":
-        case "tx_unjail_validator.wasm":
-          this.updateValidator(validator, epoch)
-          break
-        case "tx_init_proposal.wasm":
-        case "tx_vote_proposal.wasm":
-          this.updateProposal(proposal, epoch)
-          break
+    const { type: txType, data: txData } = transaction.data?.content || {}
+    if (txType) switch (txContent.type) {
+      case "tx_activate_validator.wasm":
+      case "tx_add_validator.wasm":
+      case "tx_become_validator.wasm":
+      case "tx_bond.wasm":
+      case "tx_change_validator_commission.wasm":
+      case "tx_change_validator_metadata.wasm":
+      case "tx_change_validator_power.wasm":
+      case "tx_deactivate_validator.wasm":
+      case "tx_reactivate_validator.wasm":
+      case "tx_remove_validator.wasm":
+      case "tx_unjail_validator.wasm": {
+        console.log(`Block ${height} (epoch ${epoch}): Updating validator`, txContent.data.validator)
+        this.updateValidator(txContent.data.validator, epoch)
+        break
+      }
+      case "tx_init_proposal.wasm": {
+        const initTx = transaction.id
+        const { content, ...metadata } = content.data || {}
+        const id = findProposalId(blockResults.endBlockEvents)
+        if (id) {
+          console.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
+          await DB.Proposal.create({id, content, metadata, initTx}, {transaction: dbTransaction})
+        } else {
+          console.log(`Block ${height} (epoch ${epoch}): New proposal, unknown id, updating all`)
+          await this.updateGovernance()
+        }
+        break
+      }
+      case "tx_vote_proposal.wasm": {
+        console.log(`Block ${height} (epoch ${epoch}): Vote`)
+        console.log(content)
+        await waitForever()
+        const { id, content, ...metadata } = content.data || {}
+        console.log('Updating proposal', proposal, 'at epoch', epoch)
+        this.updateProposal(id, epoch)
+        break
       }
     } else {
       console.warn("No supported TX content in", transaction.id)
     }
-    const data = {
+    await DB.Transaction.upsert({
       chainId:     transaction.data.chainId,
       blockHash:   transaction.block.hash,
       blockTime:   transaction.block.time,
       blockHeight: transaction.block.height,
       txHash:      transaction.id,
       txTime:      transaction.data.timestamp,
-      txType:      transaction.data.content?.type,
-      txContent:   transaction.data.content?.data,
+      txType:      txType,
+      txContent:   txData,
       txData:      transaction, // TODO deprecate
-    }
-    await DB.Transaction.upsert(data, { transaction: dbTransaction })
+    }, { transaction: dbTransaction })
   }
 
   async updateValidators (epoch) {
@@ -339,12 +342,15 @@ export class Updater {
 
   async updateGovernance (epoch) {
     const proposals = await this.chain.fetchProposalCount(epoch)
-    console.log('Fetching', proposals, 'proposals, starting from latest')
+    console.log('Epoch', epoch, 'updating', proposals, 'proposals, starting from latest')
     const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
-    await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
+    //await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
+    for (const id of inputs) {
+      await this.updateProposal(id, epoch)
+    }
   }
 
-  async updateProposal (id, epoch) {
+  async updateProposal (id, epoch, initTx) {
     console.log('Fetching proposal', id)
     const [proposal, votes, result] = await Promise.all([
       this.chain.fetchProposalInfo(id),
@@ -353,26 +359,26 @@ export class Updater {
     ])
     const { id: _, content, ...metadata } = proposal
     if (metadata?.type?.ops instanceof Set) metadata.type.ops = [...metadata.type.ops]
-    console.log({id, votes})
-    //if (votes.length > 0) {
-      //await waitForever()
-    //}
+    //console.log({id, votes, content, metadata})
+    if (votes.length > 0) {
+      await waitForever()
+    }
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
       console.log('Adding proposal', id, 'with', votes.length, 'votes')
-      await DB.Proposal.destroy({ where: { id } }, { transaction: dbTransaction })
-      await DB.Proposal.create({ id, content, metadata, result }, { transaction: dbTransaction })
+      await DB.Proposal.upsert({
+        id,
+        content,
+        metadata,
+        result,
+        initTx
+      }, { transaction: dbTransaction })
       console.log('Adding votes for', id, 'count:', votes.length, 'vote(s)')
       await DB.Vote.destroy({ where: { proposal: id } }, { transaction: dbTransaction })
       for (const vote of votes) {
         console.log('Adding vote for', id)
         await DB.Vote.create({ proposal: id, data: vote }, { transaction: dbTransaction })
       }
-    }), {
-      update: 'proposal',
-      //height,
-      epoch,
-      id,
-    })
+    }), { update: 'proposal', id, })
     if (metadata.type?.type === 'DefaultWithWasm') {
       console.log('Fetching WASM for proposal', id)
       const result = await this.chain.fetchProposalWasm(id)
@@ -388,4 +394,35 @@ export class Updater {
     console.log(`Epoch ${epoch}: added proposal ${id} with ${votes.length} votes`)
   }
 
+}
+
+function findProposalId (endBlockEvents) {
+  let found = null
+  for (const [ type, attributes ] of Object.entries(endBlockEvents)) {
+    if (type === 'tx/applied') {
+      for (const [ key, value ] of Object.entries(attributes)) {
+        if (key === 'hash' && value === transaction.id) {
+          for (const [ key, value ] of Object.entries(attributes)) {
+            if (key === 'batch') {
+              const batch = JSON.parse(value)
+              const { Ok } = Object.values(batch)[0] || {}
+              if (Ok) {
+                const { events } = Ok
+                for (const event of events) {
+                  if (event.event_type?.inner === 'governance/proposal/new') {
+                    found = attributes.proposal_id
+                    break
+                  }
+                }
+              }
+            }
+            if (found !== null) break
+          }
+        }
+        if (found !== null) break
+      }
+    }
+    if (found !== null) break
+  }
+  return found
 }

@@ -183,6 +183,7 @@ export const
     content:  JSONField('content'),
     metadata: JSONField('metadata'),
     result:   NullableJSONField('result'),
+    initTx:   { type: TEXT, allowNull: true }
   }),
 
   ProposalWASM = db.define('proposal_wasm', {

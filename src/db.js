@@ -236,3 +236,11 @@ export function stringifier (_, value) {
   }
   return value;
 }
+
+export function atomic (transaction, operation) {
+  if (transaction) {
+    return operation(transaction)
+  } else {
+    return db.transaction(transaction=>callback(transaction))
+  }
+}

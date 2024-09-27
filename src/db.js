@@ -194,11 +194,15 @@ export const
 
   Vote = db.define("vote", {
     ...compoundPrimaryKey({
-      proposal: { type: INTEGER, },
-      voter:    { type: TEXT, },
+      proposal:  { type: INTEGER, },
+      voter:     { type: TEXT, },
     }),
-    vote:       { type: TEXT, },
-    voteTx:     { type: TEXT, allowNull: true }
+    vote:        { type: TEXT, },
+    voteTx:      { type: TEXT, allowNull: true },
+    power:       { type: TEXT, allowNull: true },
+    validator:   { type: TEXT, allowNull: true },
+    delegator:   { type: TEXT, allowNull: true },
+    isValidator: { type: BOOLEAN, allowNull: true },
   });
 
 export function logErrorToDB (error, info) {

@@ -200,6 +200,7 @@ export class Updater {
       retryForever(1000, this.chain.fetchBlockResults.bind(this.chain, { height })),
     ])
     this.log.br().log(`Block ${height} (epoch ${epoch})`)
+    const votedProposals = new Set()
     await DB.withErrorLog(() => DB.default.transaction(async dbTransaction => {
       // Update block record
       await DB.Block.upsert({
@@ -215,16 +216,26 @@ export class Updater {
       }, { transaction: dbTransaction })
       // Update transaction records from block
       for (const transaction of block.transactions) await this.updateTransaction({
-        epoch, height, blockResults, transaction, dbTransaction
+        epoch, height, blockResults, transaction, votedProposals, dbTransaction
       })
     }), { update: 'block', height })
+    for (const id of [...votedProposals]) {
+      await this.updater.updateProposalVotes(id, epoch)
+    }
     // Log performed updates.
     const t = performance.now() - t0
     this.log(`Block ${height} (epoch ${epoch}): added in`, t.toFixed(0), 'msec')
   }
 
   /** Update a single transaction in the database. */
-  async updateTransaction ({ epoch, height, blockResults, transaction, dbTransaction, }) {
+  async updateTransaction ({
+    epoch,
+    height,
+    blockResults,
+    votedProposals = new Set(),
+    transaction,
+    dbTransaction,
+  }) {
     this.log(
       `Block ${height} (epoch ${epoch})`,
       `TX ${transaction.data.content?.type}`, transaction.id
@@ -241,6 +252,7 @@ export class Updater {
       case "tx_deactivate_validator.wasm":
       case "tx_reactivate_validator.wasm":
       case "tx_remove_validator.wasm":
+      case "tx_unbond.wasm":
       case "tx_unjail_validator.wasm": {
         console.log(`Block ${height} (epoch ${epoch}): Updating validator`, txData.validator)
         this.updateValidator(txData.validator, epoch)
@@ -265,6 +277,7 @@ export class Updater {
       }
       case "tx_vote_proposal.wasm": {
         console.log(`Block ${height} (epoch ${epoch}) Vote on`, txData.id, 'by', txData.voter)
+        votedProposals.add(txData.id)
         await DB.Vote.upsert({
           proposal: txData.id,
           voter:    txData.voter,
@@ -353,6 +366,36 @@ export class Updater {
     for (const id of inputs) {
       await this.updateProposal(id, epoch)
     }
+  }
+
+  async updateProposalVotes (id, epoch) {
+    const votes = await runParallel({
+      max:     30,
+      inputs:  await this.chain.fetchProposalVotes(id),
+      process: async vote => {
+        const isValidator = vote.isValidator
+        const kind  = isValidator ? 'validator' : 'delegator'
+        const voter = isValidator ? vote.validator : vote.delegator
+        const power = isValidator
+          ? await this.chain.fetchValidatorStake(vote.validator, epoch)
+          : await this.chain.fetchBondWithSlashing(vote.validator, vote.delegator, epoch)
+        console.log(`Epoch ${epoch} proposal ${id} vote by ${kind} ${voter}: ${power}`)
+        return {
+          proposal,
+          voter,
+          isValidator,
+          validator: vote.validator,
+          delegator: vote.delegator,
+          power
+        }
+      }
+    })
+    console.log({votes})
+    await DB.default.transaction(async dbTransaction => {
+      await Promise.all(votes.map(vote=>DB.Vote.upsert(vote, {transaction: dbTransaction})))
+    })
+    console.log(`Epoch ${epoch} proposal ${id}:`, votes.length, 'votes updated')
+    await waitForever()
   }
 
   async updateProposal (id, epoch, initTx) {

@@ -1,4 +1,5 @@
 import { Console } from "@hackbg/logs"
+import { base64 } from "@hackbg/fadroma";
 import { Sequelize, DataTypes, Op } from "sequelize"
 import PG from "pg"
 import { CHAIN_ID, DATABASE_URL } from "./config.js"
@@ -7,7 +8,7 @@ export { Sequelize, DataTypes, Op }
 
 const console = new Console("DB");
 
-const { DATE, TEXT, BLOB, JSONB, INTEGER, ENUM } = DataTypes
+const { DATE, TEXT, BLOB, JSONB, INTEGER, ENUM, BOOLEAN } = DataTypes
 
 const db = new Sequelize(DATABASE_URL, {
   dialect: "postgres",
@@ -72,8 +73,6 @@ const compoundPrimaryKey = (fields) => Object.fromEntries(
     allowNull:  false,
   }])
 )
-
-import { serialize } from './utils.js'
 
 export const JSONField = name => ({
   type: JSONB,
@@ -222,4 +221,18 @@ export async function withErrorLog (callback, info) {
     await logErrorToDB(error, info)
     throw error
   }
+}
+
+export function serialize (data) {
+  return JSON.stringify(data, stringifier);
+}
+
+export function stringifier (_, value) {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (value instanceof Uint8Array) {
+    return base64.encode(value);
+  }
+  return value;
 }

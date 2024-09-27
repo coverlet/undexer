@@ -220,7 +220,7 @@ export class Updater {
       })
     }), { update: 'block', height })
     for (const id of [...votedProposals]) {
-      await this.updater.updateProposalVotes(id, epoch)
+      await this.updateProposalVotes(id, epoch)
     }
     // Log performed updates.
     const t = performance.now() - t0
@@ -378,10 +378,10 @@ export class Updater {
         const voter = isValidator ? vote.validator : vote.delegator
         const power = isValidator
           ? await this.chain.fetchValidatorStake(vote.validator, epoch)
-          : await this.chain.fetchBondWithSlashing(vote.validator, vote.delegator, epoch)
+          : await this.chain.fetchBondWithSlashing(vote.delegator, vote.validator, epoch)
         console.log(`Epoch ${epoch} proposal ${id} vote by ${kind} ${voter}: ${power}`)
         return {
-          proposal,
+          proposal: id,
           voter,
           isValidator,
           validator: vote.validator,

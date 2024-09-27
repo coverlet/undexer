@@ -1,5 +1,4 @@
 import { writeFile } from "node:fs/promises";
-import { base64 } from "@hackbg/fadroma";
 
 export function waitFor (msec) {
   return new Promise(resolve=>setTimeout(resolve, msec))
@@ -35,15 +34,21 @@ export async function retryForever (interval, callback) {
 
 /** Run up to `max` tasks in parallel. */
 export async function runParallel ({ max, process, inputs }) {
+  inputs = [...inputs]
+  let nextIndex = 0
+  const results = []
   const pile = new Set()
   while ((inputs.length > 0) || (pile.size > 0)) {
     while ((pile.size < max) && (inputs.length > 0)) {
-      const task = process(inputs.shift())
+      const index = nextIndex
+      nextIndex++
+      const task = process(inputs.shift()).then(result=>results[index]=result)
       pile.add(task)
       task.finally(()=>pile.delete(task))
     }
     await Promise.race([...pile])
   }
+  return results
 }
 
 export function maxBigInt (x, y) {
@@ -54,27 +59,4 @@ export function maxBigInt (x, y) {
 
 export function pad (x) {
   return String(x).padEnd(10)
-}
-
-export function cleanup (data) {
-  return JSON.parse(serialize(data))
-}
-
-export function serialize (data) {
-  return JSON.stringify(data, stringifier);
-}
-
-export function stringifier (key, value) {
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-  if (value instanceof Uint8Array) {
-    return base64.encode(value);
-  }
-  return value;
-}
-
-export async function save (path, data) {
-  console.log("Writing", path);
-  return await writeFile(path, serialize(data));
 }

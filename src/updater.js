@@ -49,7 +49,6 @@ export class Updater {
   async updateValidator (address, epoch) {
     const validator = await this.chain.fetchValidator(address, { epoch })
     await DB.Validator.upsert(Object.assign(validator, { epoch }))
-    return { added: true }
   }
 
   /** Update a single block in the database. */

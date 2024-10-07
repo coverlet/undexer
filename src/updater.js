@@ -1,7 +1,7 @@
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
 import { Fetcher } from './fetcher.js'
-import { runParallel } from './utils.js'
+import { runParallel, waitForever } from './utils.js'
 
 const console = new Console('')
 
@@ -38,6 +38,7 @@ export class Updater {
   }
 
   async updateValidators (inputs, epoch) {
+    this.log("Updating", inputs.length, "validator(s)")
     await DB.default.transaction(transaction=>runParallel({
       max: 50, inputs, process: validator => DB.Validator.upsert(
         Object.assign(validator, { epoch }),
@@ -95,8 +96,13 @@ export class Updater {
     })
 
     // Update post-fetched things.
-    await this.updateValidators([...updatedValidators], epoch)
-    for (const id of [...votedProposals]) await this.updateProposalVotes(id, epoch)
+    if (updatedValidators.size > 0) {
+      const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
+      await this.updateValidators(validators, epoch)
+    }
+    if (votedProposals.size > 0) {
+      await this.updateProposalsVotes([...votedProposals], epoch)
+    }
 
     // Log performed updates.
     const t = performance.now() - t0
@@ -204,6 +210,13 @@ export class Updater {
 
     if (metadata.type?.type === 'DefaultWithWasm') await this.updateProposalWasm(id)
     console.log(`Epoch ${epoch} added proposal ${id} with ${votes.length} votes`)
+  }
+
+  async updateProposalsVotes (inputs, epoch) {
+    this.log("Updating votes of", inputs.length, "proposal(s)")
+    for (const id of inputs) {
+      await this.updateProposalVotes(id, epoch)
+    }
   }
 
   async updateProposalVotes (id, epoch) {

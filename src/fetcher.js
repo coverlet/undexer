@@ -18,11 +18,11 @@ export class Fetcher {
   }
   
   fetchBlockResults (height) {
-    return retryForever(1000, () => this.chain.fetchBlockResults.bind(this.chain, { height }))
+    return retryForever(1000, () => this.chain.fetchBlockResults({ height }))
   }
 
   fetchEpoch (height) {
-    return retryForever(1000, () => this.chain.fetchEpoch.bind(this.chain, { height }))
+    return retryForever(1000, () => this.chain.fetchEpoch({ height }))
   }
 
   async fetchCurrentAndPastConsensusValidatorAddresses (epoch) {

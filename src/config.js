@@ -6,7 +6,7 @@ export const DEFAULT_PAGE_LIMIT = 25
 export const DEFAULT_PAGE_OFFSET = 0
 
 export const CHAIN_ID =
-  process.env.CHAIN_ID || 'housefire-head.a03c8e8948ed20b'
+  process.env.CHAIN_ID || 'housefire-reduce.e51ecf4264fc3'
 
 export const DATABASE_URL =
   process.env.DATABASE_URL || `postgres://postgres:insecure@localhost:5432/${CHAIN_ID}`

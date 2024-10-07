@@ -104,10 +104,10 @@ export const VALIDATOR_STATES = [
 ]
 
 const blockMeta = () => ({
-  chainId:      { type: TEXT,    allowNull: false },
-  blockHash:    { type: TEXT,    allowNull: false },
-  blockHeight:  { type: INTEGER, allowNull: false },
-  blockTime:    { type: DATE },
+  chainId:     { type: TEXT,    allowNull: false },
+  blockHash:   { type: TEXT,    allowNull: false },
+  blockHeight: { type: INTEGER, allowNull: false },
+  blockTime:   { type: DATE },
 })
 
 export const PROPOSAL_STATUS = [
@@ -197,11 +197,13 @@ export const
       voter:     { type: TEXT, },
     }),
     vote:        { type: TEXT, },
-    voteTx:      { type: TEXT, allowNull: true },
-    power:       { type: TEXT, allowNull: true },
-    validator:   { type: TEXT, allowNull: true },
-    delegator:   { type: TEXT, allowNull: true },
+    voteTx:      { type: TEXT,    allowNull: true },
+    power:       { type: INTEGER, allowNull: true },
+    validator:   { type: TEXT,    allowNull: true },
+    delegator:   { type: TEXT,    allowNull: true },
     isValidator: { type: BOOLEAN, allowNull: true },
+    height:      { type: INTEGER },
+    epoch:       { type: INTEGER },
   });
 
 export function logErrorToDB (error, info) {

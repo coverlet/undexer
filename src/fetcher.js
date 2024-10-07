@@ -48,9 +48,10 @@ export class Fetcher {
   }
 
   async fetchProposalVotes (id, epoch) {
+    const votes = await this.chain.fetchProposalVotes(id)
     return await runParallel({
       max:     30,
-      inputs:  await this.chain.fetchProposalVotes(id),
+      inputs:  votes,
       process: async vote => {
         const isValidator = vote.isValidator
         const kind  = isValidator ? 'validator' : 'delegator'

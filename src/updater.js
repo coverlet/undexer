@@ -17,7 +17,7 @@ export class Updater {
   async updateTotalStake (epoch) {
     this.log("Updating total stake at epoch", epoch)
     const total = await this.fetcher.fetchTotalStake({ epoch })
-    console.log('Epoch', epoch, 'total stake:', total)
+    this.log('Epoch', epoch, 'total stake:', total)
   }
 
   async updateAllValidators (epoch) {
@@ -27,14 +27,14 @@ export class Updater {
     const consAddrs = await this.fetcher.fetchCurrentAndPastConsensusValidatorAddresses(epoch)
     const consVals  = await this.fetcher.fetchValidators(consAddrs, epoch)
     await this.updateValidators(consVals, epoch)
-    console.log('Epoch', epoch, `updated`, consVals.length,
-                `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's')
+    this.log('Epoch', epoch, `updated`, consVals.length,
+             `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's')
 
     const otherAddrs = await this.fetcher.fetchRemainingValidatorAddresses(consAddrs, epoch)
     const otherVals  = await this.fetcher.fetchValidators(otherAddrs, epoch)
     await this.updateValidators(otherVals, epoch)
-    console.log('Epoch', epoch, `updated`, otherVals.length,
-                `validators total in`, ((performance.now()-t0)/1000).toFixed(3), 's')
+    this.log('Epoch', epoch, `updated`, otherVals.length,
+             `validators total in`, ((performance.now()-t0)/1000).toFixed(3), 's')
   }
 
   async updateValidators (inputs, epoch) {
@@ -95,13 +95,41 @@ export class Updater {
       })
     })
 
-    // Update post-fetched things.
+    // Populate stake for updated validators
     if (updatedValidators.size > 0) {
       const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
       await this.updateValidators(validators, epoch)
     }
-    if (votedProposals.size > 0) {
-      await this.updateProposalsVotes([...votedProposals], epoch)
+
+    // Populate voting powers for new votes
+    const unpopulatedVotes = await DB.Vote.findAll({ where: { power: null } })
+    const unpopulatedVoteProposals = new Set()
+    for (const vote of unpopulatedVotes) {
+      if (!unpopulatedVoteProposals.has(vote.proposal)) {
+        this.log('Found vote with unknown power for proposal', vote.proposal)
+        unpopulatedVoteProposals.add(vote.proposal)
+      }
+    }
+    const unpopulatedVoteProposalVotes = {}
+    for (const proposal of unpopulatedVoteProposals) {
+      unpopulatedVoteProposalVotes[proposal] = await this.fetcher.fetchProposalVotes(proposal, epoch)
+    }
+    for (const [proposal, votes] of Object.entries(unpopulatedVoteProposalVotes)) {
+      this.log('Populating vote powers for proposal', proposal, votes)
+      for (const { isValidator, validator, delegator } of votes) {
+        const voter = isValidator ? validator : delegator
+        const power = isValidator
+          ? await this.fetcher.chain.fetchValidatorStake(validator, epoch)
+          : await this.fetcher.chain.fetchBondWithSlashing(delegator, validator, epoch)
+        await DB.Vote.upsert({
+          proposal,
+          voter,
+          isValidator,
+          validator,
+          delegator,
+          power,
+        }, {transaction})
+      }
     }
 
     // Log performed updates.
@@ -113,7 +141,7 @@ export class Updater {
   async updateTx (tx, options) {
     const { epoch, height, transaction, } = options
     this.log(`Block ${height} (epoch ${epoch})`,
-             `TX ${tx.data?.content?.type}`, transaction.id)
+             `TX ${tx.data?.content?.type}`, tx.id)
     await this.updateTxContent(tx, options)
     await DB.Transaction.upsert({
       chainId:     tx.data.chainId,
@@ -144,7 +172,7 @@ export class Updater {
       case "tx_remove_validator.wasm":
       case "tx_unbond.wasm":
       case "tx_unjail_validator.wasm": {
-        console.log(`Block ${height} (epoch ${epoch}): Will update validator`, txData.validator)
+        this.log(`Block ${height} (epoch ${epoch}): Will update validator`, txData.validator)
         updatedValidators.add(txData.validator)
         break
       }
@@ -152,20 +180,26 @@ export class Updater {
         const { content, ...metadata } = txData || {}
         const id = findProposalId(blockResults.endBlockEvents, tx.id)
         if (id) {
-          console.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
+          this.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
           const data = { id, content, metadata, initTx: tx.id }
           await DB.Proposal.upsert(data, {transaction})
         } else {
-          console.log(`Block ${height} (epoch ${epoch}): New proposal, unknown id, updating all`)
+          this.log(`Block ${height} (epoch ${epoch}): New proposal, unknown id, updating all`)
           await this.updateGovernance()
         }
         break
       }
       case "tx_vote_proposal.wasm": {
-        console.log(`Block ${height} (epoch ${epoch}) Vote on`, txData.id, 'by', txData.voter)
+        this.log(`Block ${height} (epoch ${epoch}) Vote on`, txData.id, 'by', txData.voter, ':', txData)
         votedProposals.add(txData.id)
-        const data = { proposal: txData.id, voter: txData.voter, vote: txData.vote, voteTx: tx.id }
-        await DB.Vote.upsert(data, {transaction})
+        await DB.Vote.upsert({
+          proposal: txData.id,
+          voter:    txData.voter,
+          vote:     txData.vote,
+          voteTx:   tx.id,
+          epoch,
+          height
+        }, {transaction})
         break
       }
     } else {
@@ -175,7 +209,7 @@ export class Updater {
 
   async updateGovernance (epoch) {
     const proposals = await this.chain.fetchProposalCount(epoch)
-    console.log('Epoch', epoch, 'updating', proposals, 'proposals, starting from latest')
+    this.log('Epoch', epoch, 'updating', proposals, 'proposals, starting from latest')
     const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
     //await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch) })
     for (const id of inputs) {
@@ -184,7 +218,7 @@ export class Updater {
   }
 
   async updateProposal (id, epoch, initTx) {
-    console.log('Fetching proposal', id)
+    this.log('Fetching proposal', id)
     const [proposal, votes, result] = await Promise.all([
       this.chain.fetchProposalInfo(id),
       this.chain.fetchProposalVotes(id),
@@ -192,24 +226,20 @@ export class Updater {
     ])
     const { id: _, content, ...metadata } = proposal
     if (metadata?.type?.ops instanceof Set) metadata.type.ops = [...metadata.type.ops]
-    //console.log({id, votes, content, metadata})
-    if (votes.length > 0) {
-      await waitForever()
-    }
     await DB.withErrorLog(() => DB.default.transaction(async transaction => {
-      console.log('Adding proposal', id, 'with', votes.length, 'votes')
+      this.log('Adding proposal', id, 'with', votes.length, 'votes')
       const fields = { id, content, metadata, result, initTx }
       await DB.Proposal.upsert(fields, {transaction})
-      console.log('Adding votes for', id, 'count:', votes.length, 'vote(s)')
+      this.log('Adding votes for', id, 'count:', votes.length, 'vote(s)')
       await DB.Vote.destroy({ where: { proposal: id } }, {transaction})
       for (const vote of votes) {
-        console.log('Adding vote for', id)
-        await DB.Vote.create({ proposal: id, data: vote }, {transaction})
+        this.log('Adding vote for', id)
+        await DB.Vote.upsert({ proposal: id, vote }, {transaction})
       }
     }), { update: 'proposal', id, })
 
     if (metadata.type?.type === 'DefaultWithWasm') await this.updateProposalWasm(id)
-    console.log(`Epoch ${epoch} added proposal ${id} with ${votes.length} votes`)
+    this.log(`Epoch ${epoch} added proposal ${id} with ${votes.length} votes`)
   }
 
   async updateProposalsVotes (inputs, epoch) {
@@ -224,17 +254,16 @@ export class Updater {
     await DB.default.transaction(async transaction => {
       await Promise.all(votes.map(vote=>DB.Vote.upsert(vote, {transaction})))
     })
-    console.log(`Epoch ${epoch} proposal ${id}:`, votes.length, 'votes updated')
-    await waitForever()
+    this.log(`Epoch ${epoch} proposal ${id}:`, votes.length, 'votes updated')
   }
 
   async updateProposalWasm (id) {
-    console.log('Fetching WASM for proposal', id)
+    this.log('Fetching WASM for proposal', id)
     const result = await this.chain.fetchProposalWasm(id)
     if (result) {
       const { id, codeKey, wasm } = result
       await DB.withErrorLog(()=> DB.default.transaction(async transaction => {
-        console.log('++ Adding proposal WASM for', id, 'length:', wasm.length, 'bytes')
+        this.log('++ Adding proposal WASM for', id, 'length:', wasm.length, 'bytes')
         await DB.ProposalWASM.destroy({ where: { id } }, { transaction })
         await DB.ProposalWASM.create({ id, codeKey, wasm }, { transaction })
       }))
@@ -256,7 +285,6 @@ function findProposalId (endBlockEvents, txHash) {
                 const { events } = Ok
                 for (const event of events) {
                   if (event.event_type?.inner === 'governance/proposal/new') {
-                    console.log({ found: event.attributes.proposal_id })
                     return event.attributes.proposal_id
                   }
                 }

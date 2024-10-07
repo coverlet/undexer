@@ -76,7 +76,7 @@ export class Updater {
     // Update the block and the contained transaction.
     await DB.default.transaction(async transaction => {
       // Update block record
-      await DB.Block.upsert({
+      const data = {
         chainId:      block.header.chainId,
         blockTime:    block.time,
         blockHeight:  block.height,
@@ -86,7 +86,8 @@ export class Updater {
         blockResults: JSON.parse(block.responses?.results?.response||"null"),
         rpcResponses: block.responses,
         epoch,
-      }, { transaction })
+      }
+      await DB.Block.upsert(data, { transaction })
       // Update transaction records from block
       for (const tx of block.transactions) await this.updateTx(tx, {
         epoch, height, blockResults, votedProposals, updatedValidators, transaction
@@ -106,8 +107,8 @@ export class Updater {
   async updateTx (tx, options) {
     const { epoch, height, transaction, } = options
     this.log(`Block ${height} (epoch ${epoch})`,
-             `TX ${transaction.data.content?.type}`, transaction.id)
-    await this.updateTxContent(tx, blockResutransaction)
+             `TX ${tx.data?.content?.type}`, transaction.id)
+    await this.updateTxContent(tx, options)
     await DB.Transaction.upsert({
       chainId:     tx.data.chainId,
       blockHash:   tx.block.hash,
@@ -115,8 +116,8 @@ export class Updater {
       blockHeight: tx.block.height,
       txHash:      tx.id,
       txTime:      tx.data.timestamp,
-      txType:      txType,
-      txContent:   txData,
+      txType:      tx.data.content.type,
+      txContent:   tx.data.content.data,
       txData:      tx, // TODO deprecate
     }, { transaction })
   }

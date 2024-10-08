@@ -179,8 +179,8 @@ export const
 
   Proposal = db.define('proposal', {
     id:       IntegerPrimaryKey(),
-    content:  JSONField('content'),
-    metadata: JSONField('metadata'),
+    content:  NullableJSONField('content'),
+    metadata: NullableJSONField('metadata'),
     result:   NullableJSONField('result'),
     initTx:   { type: TEXT, allowNull: true }
   }),
@@ -193,17 +193,16 @@ export const
 
   Vote = db.define("vote", {
     ...compoundPrimaryKey({
-      proposal:  { type: INTEGER, },
-      voter:     { type: TEXT, },
+      proposal:    { type: INTEGER, },
+      validator:   { type: TEXT,    allowNull: true },
+      delegator:   { type: TEXT,    allowNull: true },
+      isValidator: { type: BOOLEAN, allowNull: true },
     }),
-    vote:        { type: TEXT, },
-    voteTx:      { type: TEXT,    allowNull: true },
-    power:       { type: INTEGER, allowNull: true },
-    validator:   { type: TEXT,    allowNull: true },
-    delegator:   { type: TEXT,    allowNull: true },
-    isValidator: { type: BOOLEAN, allowNull: true },
-    height:      { type: INTEGER },
-    epoch:       { type: INTEGER },
+    data:   { type: TEXT, },
+    voteTx: { type: TEXT, allowNull: true },
+    power:  { type: TEXT, allowNull: true },
+    height: { type: INTEGER, allowNull: true },
+    epoch:  { type: INTEGER, allowNull: true },
   });
 
 export function logErrorToDB (error, info) {

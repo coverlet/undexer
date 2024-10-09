@@ -2,15 +2,14 @@ openapi: 3.0.0
 
 info:
   title: Namada Undexer REST API
-  version: 2.0.0
+  version: 4.0.0
   description: "API for accessing Namada blockchain data via Undexer."
   contact: 
     email: hello@hack.bg
     url: "https://github.com/hackbg/undexer"
 
 servers:
-  - url: "https://undexer-v3.demo.hack.bg/v3/"
-  - url: /v3/
+  - url: "https://undexer.hack.bg/v4/"
 
 paths:
 

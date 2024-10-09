@@ -69,7 +69,7 @@ export const GOVERNANCE_TRANSACTIONS = [
 
 export const TOKENS = [
   {
-    "address": "tnam1q87wtaqqtlwkw927gaff34hgda36huk0kgry692a",
+    "address": "tnam1qxgfw7myv4dh0qna4hq0xdg6lx77fzl7dcem8h7e",
     "symbol": "NAM",
     "coin": "Namada"
   },

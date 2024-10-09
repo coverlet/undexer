@@ -12,8 +12,7 @@ export const DATABASE_URL =
   process.env.DATABASE_URL || `postgres://postgres:insecure@localhost:5432/${CHAIN_ID}`
 
 export const RPC_URL =
-  //process.env.RPC_URL || 'https://rpc.housefire.tududes.com/';
-  process.env.RPC_URL || 'https://rpc.knowable.run/';
+  process.env.RPC_URL || 'https://namada-rpc-housefire.mandragora.io/';
 
 export const BLOCK_POLL =
   Boolean(process.env.BLOCK_POLL) || false

@@ -83,7 +83,7 @@ export class EpochIndexer extends EpochCounter {
       this.changed = false
     }
     if (await this.remote.isPaused()) {
-      this.log('🟢 Resuming sync')
+      console.log('🟢 Resuming sync')
       await this.remote.resume()
     }
   }

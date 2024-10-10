@@ -1,13 +1,14 @@
 import * as Namada from "@fadroma/namada";
 import { readFile } from "fs/promises";
-import {
-  CHAIN_ID,
-  PRE_UNDEXER_RPC_URL,
-  POST_UNDEXER_RPC_URL,
-  NODE_LOWEST_BLOCK_HEIGHT
-} from './config.js';
+import { CHAIN_ID, RPC_URL } from './config.js';
 
-const rpcVariant = async url => {
+let rpc
+
+export default function getRPC () {
+  return rpc ??= rpcVariant(RPC_URL)
+}
+
+async function rpcVariant (url) {
   const decoder = await readFile("node_modules/@fadroma/namada/pkg/fadroma_namada_bg.wasm")
   let connection
   while (true) {
@@ -29,45 +30,7 @@ const rpcVariant = async url => {
   return connection
 }
 
-/** Map of first block number that uses a certain RPC URL
-  * to a pair of { query, connection } objects that wrap the RPC. */
-export const rpcs = toSortedRPCs({
-  1: rpcVariant(PRE_UNDEXER_RPC_URL),
-  [NODE_LOWEST_BLOCK_HEIGHT]: rpcVariant(POST_UNDEXER_RPC_URL),
-})
-
-/** Validate record of (first block number -> RPC) and
-  * convert to list (latest first). */
-function toSortedRPCs (rpcs) {
-  const sortedRPCs = []
-  const limits = new Set()
-  for (const limit of Object.keys(rpcs)) {
-    if (isNaN(Number(limit))) {
-      throw new Error(`Non-number block limit ${limit}`)
-    }
-  }
-  for (const limit of Object.keys(rpcs).sort((a,b)=>b-a)) {
-    if (limits.has(Number(limit))) {
-      throw new Error(`Duplicate block limit ${limit}`)
-    }
-    limits.add(Number(limit))
-    sortedRPCs.push([Number(limit), rpcs[limit]])
-  }
-  return sortedRPCs
-}
-
-/** Iterate over list of (first block number, RPC)
-  * and return the RPC corresponding to a given height */
-export default function getRPC (height = Infinity) {
-  for (const [limit, variant] of rpcs) {
-    if (height >= limit) {
-      return variant
-    }
-  }
-  throw new Error(`Could not find suitable RPC for height ${height}`)
-}
-
-export async function rpcHeight (req, res) {
+export async function rpcHeight (_, res) {
   const chain = await getRPC()
   res.status(200).send({
     timestamp: new Date().toISOString(),
@@ -76,7 +39,7 @@ export async function rpcHeight (req, res) {
   })
 }
 
-export async function rpcTotalStaked (req, res) {
+export async function rpcTotalStaked (_, res) {
   const chain = await getRPC()
   res.status(200).send({
     timestamp:   new Date().toISOString(),
@@ -85,7 +48,7 @@ export async function rpcTotalStaked (req, res) {
   })
 }
 
-export async function rpcEpoch (req, res) {
+export async function rpcEpoch (_, res) {
   const chain = await getRPC()
   const [epoch, firstBlock, duration] = await Promise.all([
     chain.fetchEpoch(),
@@ -101,25 +64,25 @@ export async function rpcEpoch (req, res) {
   }))
 }
 
-export async function rpcStakingParameters (req, res) {
+export async function rpcStakingParameters (_, res) {
   const chain = await getRPC()
   const parameters = await chain.fetchStakingParameters();
   res.status(200).send(filterBigInts(parameters));
 }
 
-export async function rpcGovernanceParameters (req, res) {
+export async function rpcGovernanceParameters (_, res) {
   const chain = await getRPC();
   const parameters = await chain.fetchGovernanceParameters();
   res.status(200).send(filterBigInts(parameters));
 }
 
-export async function rpcPGFParameters (req, res) {
+export async function rpcPGFParameters (_, res) {
   const chain = await getRPC();
   const parameters = await chain.fetchPGFParameters();
   res.status(200).send(filterBigInts(parameters));
 }
 
-export async function rpcProtocolParameters (req, res) {
+export async function rpcProtocolParameters (_, res) {
   const chain = await getRPC();
   const param = await chain.fetchProtocolParameters();
   res.status(200).send(filterBigInts(param));

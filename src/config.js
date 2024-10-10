@@ -8,8 +8,18 @@ export const DEFAULT_PAGE_OFFSET = 0
 export const CHAIN_ID =
   process.env.CHAIN_ID || 'housefire-reduce.e51ecf4264fc3'
 
+export const DATABASE_USER =
+  process.env.DATABASE_USER || 'postgres'
+export const DATABASE_PASS =
+  process.env.DATABASE_PASS || 'insecure'
+export const DATABASE_HOST =
+  process.env.DATABASE_HOST || 'localhost'
+export const DATABASE_PORT =
+  process.env.DATABASE_PORT || '5432'
+export const DATABASE_NAME =
+  process.env.DATABASE_NAME || CHAIN_ID
 export const DATABASE_URL =
-  process.env.DATABASE_URL || `postgres://postgres:insecure@localhost:5432/${CHAIN_ID}`
+  process.env.DATABASE_URL || `postgres://${DATABASE_USER}:${DATABASE_PASS}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}`
 
 export const RPC_URL =
   process.env.RPC_URL || 'https://namada-rpc-housefire.mandragora.io/';

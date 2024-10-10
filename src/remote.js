@@ -2,7 +2,7 @@ import { Console } from '@fadroma/namada'
 const console = new Console('')
 
 export class RemoteControl {
-  constructor (chain, ws, api = 'http://localhost:25555/') {
+  constructor (chain, ws, api = 'http://node-out:25552/') {
     this.api = api
     this.ws = ws
 
@@ -14,7 +14,7 @@ export class RemoteControl {
 
   async isPaused () {
     const status = await (await fetch(this.api)).json()
-    return !status.services.proxy
+    return !status
   }
 
   async resume () {
@@ -36,7 +36,7 @@ export class ReconnectingWebSocket {
   }
 
   connect (backoff = 0) {
-    return this.socket = new Promise(async resolve => {
+    return this.socket = new Promise(async (resolve, reject) => {
       if (backoff > 0) {
         console.log('Waiting for', backoff, 'msec before connecting to socket...')
         await new Promise(resolve=>setTimeout(resolve, backoff))
@@ -45,7 +45,14 @@ export class ReconnectingWebSocket {
         console.log('Connecting to', this.url)
         const socket = new WebSocket(this.url)
 
+        const onConnectError = (error) => {
+          console.error(`🔴 Error connecting to ${this.url}:`, error)
+          reject(error)
+        }
+        socket.addEventListener('error', onConnectError)
+
         socket.addEventListener('open', () => {
+          socket.removeEventListener('error', onConnectError)
           console.log('Connected to', this.url)
           backoff = 0
           resolve(socket)

@@ -8,7 +8,7 @@ export const DATABASE_HOST      = process.env.DATABASE_HOST     || 'localhost'
 export const DATABASE_PORT      = process.env.DATABASE_PORT     || '5432'
 export const DATABASE_NAME      = process.env.DATABASE_NAME     || CHAIN_ID
 export const DATABASE_URL       = process.env.DATABASE_URL      || `postgres://${DATABASE_USER}:${DATABASE_PASS}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}`
-export const CONTROL_URL        = process.env.CONTROL_URL       || 'ws://node-status:25555'
+export const CONTROL_URL        = process.env.CONTROL_URL       || 'ws://node-out:25552'
 export const RPC_URL            = process.env.RPC_URL           || 'http://node-in:26657'
 /// Don't reset the indexing node from scratch if more than 2 epochs out of sync
 export const ALLOW_INCOMPLETE   = Boolean(process.env.ALLOW_INCOMPLETE) || false

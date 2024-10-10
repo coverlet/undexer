@@ -4,7 +4,7 @@ import { Op, literal } from 'sequelize';
 import * as DB from './db.js';
 import * as RPC from './rpc.js';
 import * as Query from './query.js';
-import { CHAIN_ID, DEFAULT_PAGE_LIMIT, DEFAULT_PAGE_OFFSET, TOKENS } from './config.js';
+import { CHAIN_ID, DEFAULT_PAGE_SIZE, TOKENS } from './config.js';
 
 const NOT_IMPLEMENTED = (req, res) => { throw new Error('not implemented') }
 
@@ -307,8 +307,8 @@ export function withConsole (handler) {
 // Read limit/offset from query parameters and apply defaults
 function pagination (req) {
   return {
-    offset: Math.max(0,   req.query.offset ? Number(req.query.offset) : DEFAULT_PAGE_OFFSET),
-    limit:  Math.min(100, req.query.limit  ? Number(req.query.limit)  : DEFAULT_PAGE_LIMIT),
+    offset: Math.max(0,   req.query.offset ? Number(req.query.offset) : 0),
+    limit:  Math.min(100, req.query.limit  ? Number(req.query.limit)  : DEFAULT_PAGE_SIZE),
   }
 }
 
@@ -317,6 +317,6 @@ function relativePagination (req) {
   return {
     before: Math.max(0,   req.query.before || 0),
     after:  Math.max(0,   req.query.after  || 0),
-    limit:  Math.min(100, req.query.limit ? Number(req.query.limit) : DEFAULT_PAGE_LIMIT),
+    limit:  Math.min(100, req.query.limit ? Number(req.query.limit) : DEFAULT_PAGE_SIZE),
   }
 }

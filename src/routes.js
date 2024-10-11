@@ -102,7 +102,10 @@ export const routes = [
   ['/validators', async function dbValidators (req, res) {
     const { limit, offset } = pagination(req)
     const { state } = req.query
-    const where = {}
+    let { epoch } = req.query
+    epoch = Number(epoch)
+    if (isNaN(epoch)) epoch = await Query.latestEpoch()
+    const where = { epoch }
     if (state) where['state.state'] = state
     const order = [literal('"stake" collate "numeric" DESC')]
     const attrs = Query.defaultAttributes({ exclude: ['id'] })

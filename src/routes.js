@@ -103,10 +103,8 @@ export const routes = [
 
   ['/validators', async function dbValidators (req, res) {
     const { limit, offset } = pagination(req)
+    const epoch = await getEpoch(req)
     const { state } = req.query
-    let { epoch } = req.query
-    epoch = Number(epoch)
-    if (isNaN(epoch)) epoch = await Query.latestEpoch()
     const where = { epoch }
     if (state) where['state.state'] = state
     const order = [literal('"stake" collate "numeric" DESC')]
@@ -118,9 +116,11 @@ export const routes = [
     res.status(200).send(result);
   }],
 
-  ['/validators/states', async function dbValidatorStates (_req, res) {
+  ['/validators/states', async function dbValidatorStates (req, res) {
+    const epoch = await getEpoch(req)
     const states = {}
     for (const validator of await DB.Validator.findAll({
+      where: { epoch },
       attributes: { include: [ 'state' ] }
     })) {
       states[validator?.state?.state] ??= 0
@@ -308,6 +308,13 @@ export function withConsole (handler) {
       res.status(500).send('Error')
     }
   }
+}
+
+async function getEpoch (req) {
+  let { epoch } = req.query
+  epoch = Number(epoch)
+  if (isNaN(epoch)) epoch = await Query.latestEpoch()
+  return epoch
 }
 
 // Read limit/offset from query parameters and apply defaults

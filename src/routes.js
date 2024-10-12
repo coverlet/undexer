@@ -6,13 +6,15 @@ import * as RPC from './rpc.js';
 import * as Query from './query.js';
 import { CHAIN_ID, DEFAULT_PAGE_SIZE, TOKENS } from './config.js';
 
-const NOT_IMPLEMENTED = (req, res) => { throw new Error('not implemented') }
+const NOT_IMPLEMENTED = (_req, _res) => {
+  throw new Error('not implemented')
+}
 
 const chainId = CHAIN_ID
 
 export const routes = [
 
-  ['/', async function dbOverview (req, res) {
+  ['/', async function dbOverview (_req, res) {
     const timestamp = new Date().toISOString()
     const overview = await Query.overview()
     res.status(200).send({ timestamp, chainId, ...overview })
@@ -35,7 +37,7 @@ export const routes = [
   [`/parameters/governance`, RPC.rpcGovernanceParameters],
   [`/parameters/pgf`,        RPC.rpcPGFParameters],
 
-  ['/status', async function dbStatus (req, res) {
+  ['/status', async function dbStatus (_req, res) {
     const timestamp = new Date().toISOString()
     const status = await Query.status()
     res.status(200).send({ timestamp, chainId, ...status })
@@ -60,7 +62,7 @@ export const routes = [
 
   ['/block', async function dbBlock (req, res) {
     const timestamp = new Date().toISOString()
-    const attrs = Query.defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'blockData'])
+    const _attrs = /*FIXME*/ Query.defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'blockData'])
     const { height, hash } = req.query
     const block = await Query.block({ height, hash })
     if (!block) {
@@ -116,7 +118,7 @@ export const routes = [
     res.status(200).send(result);
   }],
 
-  ['/validators/states', async function dbValidatorStates (req, res) {
+  ['/validators/states', async function dbValidatorStates (_req, res) {
     const states = {}
     for (const validator of await DB.Validator.findAll({
       attributes: { include: [ 'state' ] }
@@ -138,7 +140,8 @@ export const routes = [
       validator.consensusAddress,
       ...validator.pastConsensusAddresses||[]
     ])
-    let uptime, lastSignedBlocks = [], currentHeight, countedBlocks
+    const lastSignedBlocks = []
+    let uptime, currentHeight, countedBlocks
     if ('uptime' in req.query) {
       // Count number of times the validator's consensus address is encountered
       // in the set of all signatures belonging to the past 100 blocks.
@@ -179,7 +182,7 @@ export const routes = [
     const { limit, offset } = pagination(req)
     const orderBy = req.query.orderBy ?? 'id';
     const orderDirection = req.query.orderDirection ?? 'DESC'
-    let where = {}
+    const where = {}
     const { proposalType, status, result } = req.query
     if (proposalType) where.proposalType = proposalType
     if (status) where.status = status
@@ -194,7 +197,7 @@ export const routes = [
     })
   }],
 
-  ['/proposals/stats', async function dbProposalStats (req, res) {
+  ['/proposals/stats', async function dbProposalStats (_req, res) {
     const [all, ongoing, upcoming, finished, passed, rejected] = await Promise.all([
       DB.Proposal.count(),
       DB.Proposal.count({ where: { 'metadata.status': 'ongoing' } }),

@@ -24,8 +24,8 @@ export const latestBlock = () =>
 export const oldestBlock = () =>
   DB.Block.min('blockHeight')
 
-export const totalValidators = () =>
-  DB.Validator.count()
+export const totalValidators = async (epoch) =>
+  DB.Validator.count({ where: { epoch: epoch ?? await latestEpoch() } })
 
 export const overview = ({ limit = 10 } = {}) => intoRecord({
   totalBlocks,

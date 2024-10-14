@@ -42,9 +42,11 @@ export class Fetcher {
   }
 
   async fetchValidators (inputs, epoch) {
-    return await runParallel({
-      max: 50, inputs, process: address => this.chain.fetchValidator(address, { epoch })
-    })
+    const iterator   = this.chain.fetchValidatorsIter({ epoch: Number(epoch), addresses: inputs })
+    const process    = async _ => (await iterator.next()).value
+    const validators = await runParallel({ max: 50, inputs, process })
+    console.log({validators})
+    return validators
   }
 
   async fetchProposalVotes (id, epoch) {

@@ -132,8 +132,12 @@ export const routes = [
   ['/validator', async function dbValidatorByHash (req, res) {
     const where = { publicKey: req.query.publicKey }
     const attrs = Query.defaultAttributes({ exclude: ['id'] })
+    //const order = [['epoch','DESC']]
+    //const validatorRecords = await DB.Validator.findAll({ where, order, attributes: attrs })
     let validator = await DB.Validator.findOne({ where, attributes: attrs });
-    if (validator === null) return res.status(404).send({ error: 'Validator not found' });
+    if (validator === null) {
+      return res.status(404).send({ error: 'Validator not found' })
+    }
     validator = { ...validator.get() }
     validator.metadata ??= {}
     const consensusAddresses = new Set([

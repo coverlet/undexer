@@ -145,19 +145,17 @@ export const
 
   Validator = db.define('validator', {
     ...compoundPrimaryKey({
-      epoch:                { type: INTEGER, },
-      namadaAddress:        { type: TEXT, },
+      epoch:          { type: INTEGER, },
+      namadaAddress:  { type: TEXT, },
     }),
-    publicKey:              { type: TEXT, allowNull: true },
-    pastPublicKeys:         NullableJSONField('pastPublicKeys'),
-    consensusAddress:       { type: TEXT, allowNull: true },
-    pastConsensusAddresses: NullableJSONField('pastConsensusAddresses'),
-    votingPower:            { type: TEXT, allowNull: true },
-    proposerPriority:       { type: TEXT, allowNull: true },
-    metadata:               NullableJSONField('metadata'),
-    commission:             NullableJSONField('commission'),
-    stake:                  { type: TEXT, allowNull: true },
-    state:                  NullableJSONField('state')
+    publicKey:        { type: TEXT, allowNull: true },
+    consensusAddress: { type: TEXT, allowNull: true },
+    votingPower:      { type: TEXT, allowNull: true },
+    proposerPriority: { type: TEXT, allowNull: true },
+    metadata:         NullableJSONField('metadata'),
+    commission:       NullableJSONField('commission'),
+    stake:            { type: TEXT, allowNull: true },
+    state:            NullableJSONField('state')
   }),
 
   Block = db.define('block', {

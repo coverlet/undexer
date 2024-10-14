@@ -40,7 +40,7 @@ export class Updater {
     this.log("Updating", inputs.length, "validator(s)")
     await DB.default.transaction(transaction=>runParallel({
       max: 50, inputs, process: validator => DB.Validator.upsert(
-        Object.assign(validator, { epoch }),
+        Object.assign(validator, { epoch, consensusAddress: validator.address }),
         { transaction }
       )
     }))

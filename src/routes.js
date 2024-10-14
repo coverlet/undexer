@@ -79,7 +79,6 @@ export const routes = [
       epoch:            block.epoch,
       transactionCount: transactions.count,
       transactions:     transactions.rows.map(row => row.toJSON()),
-
       proposer: await Query.validatorByConsensusAddress(
         block.blockHeader.proposerAddress
       ),
@@ -140,10 +139,7 @@ export const routes = [
     }
     validator = { ...validator.get() }
     validator.metadata ??= {}
-    const consensusAddresses = new Set([
-      validator.consensusAddress,
-      ...validator.pastConsensusAddresses||[]
-    ])
+    const consensusAddresses = await DB.validatorPublicKeyToConsensusAddresses(publicKey)
     const lastSignedBlocks = []
     let uptime, currentHeight, countedBlocks
     if ('uptime' in req.query) {

@@ -100,27 +100,28 @@ export const blocks = async ({
   limit = 15,
   publicKey
 }) => {
-  const [total, latest, oldest] =
-    await Promise.all([totalBlocks(), latestBlock(), oldestBlock()])
-  const { consensusAddress: address, pastConsensusAddresses } =
-    await validatorPublicKeyToConsensusAddresses(publicKey)
-  // TODO: use all past consensus addresses to filter block list for given validator
-  if (publicKey && !address) {
-    return {
-      address: null,
-      publicKey,
-      ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
-      count: 0,
-      blocks: []
+  const [totalBlocks, latestBlock, oldestBlock] = await Promise.all([
+    totalBlocks(), latestBlock(), oldestBlock()
+  ])
+  let addresses = []
+  if (publicKey) {
+    addresses = await validatorPublicKeyToConsensusAddresses(publicKey)
+    if (addresses.length === 0) return {
+      address: null, publicKey, ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
+      count: 0, blocks: []
     }
   }
-  const { rows, count } =
-    await (before ? blocksBefore({ before, limit, address }) :
-           after  ? blocksAfter({ after, limit, address }) :
-                   blocksLatest({ limit, address }))
+  let rows, count
+  if (before) {
+    ;({ rows, count } = await blocksBefore({ before, limit, addresses }))
+  } else if (after) {
+    ;({ rows, count } = await blocksAfter({ after, limit, addresses }))
+  } else {
+    ;({ rows, count } = await blocksLatest({ limit, addresses }))
+  }
   return {
-    address,
     publicKey,
+    addresses,
     ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
     count,
     blocks: await Promise.all(rows.map(block=>DB.Transaction
@@ -130,49 +131,44 @@ export const blocks = async ({
   }
 }
 
-//
-// select
-//   ("rpcResponses"->'block'->'response'#>>'{}')::jsonb->'result'->'block'->'proposer_address'
-// from blocks ...
-//
-// select
-//   ("rpcResponses"->'block'->'response'#>>'{}')::jsonb->'result'->'block'->'last_commit'->'signatures'
-// from blocks ...
-//
-  //console.log(req.query)
-  //if (req.query.blocks) validator.latestBlocks = await DB.Block.findAll({
-    //order: [['blockHeight', 'DESC']],
-    //limit: 15,
-    //where: { 'blockHeader.proposerAddress': validator.address },
-    //attributes: Query.defaultAttributes({ include: ['blockHash', 'blockHeight', 'blockTime'] }),
-  //})
-
-export const blocksLatest = ({ limit, address }) =>
-  DB.Block.findAndCountAll({
+export const blocksLatest = ({ limit, addresses = [] }) => {
+  const where = {}
+  if (addresses && addresses.length > 0) {
+    where['blockHeader.proposerAddress'] = { [Op.in]: addresses }
+  }
+  return DB.Block.findAndCountAll({
     attributes: BLOCK_LIST_ATTRIBUTES,
     order: [['blockHeight', 'DESC']],
     limit,
-    where: Object.assign({},
-      address ? { 'blockHeader.proposerAddress': address } : {})
+    where,
   })
+}
 
-export const blocksBefore = ({ before, limit = 15, address }) =>
-  DB.Block.findAndCountAll({
+export const blocksBefore = ({ before, limit = 15, addresses = [] }) => {
+  const where = { blockHeight: { [Op.lte]: before } }
+  if (addresses && addresses.length > 0) {
+    where['blockHeader.proposerAddress'] = { [Op.in]: addresses }
+  }
+  return DB.Block.findAndCountAll({
     attributes: BLOCK_LIST_ATTRIBUTES,
     order: [['blockHeight', 'DESC']],
     limit,
-    where: Object.assign({ blockHeight: { [Op.lte]: before } },
-      address ? { 'blockHeader.proposerAddress': address } : {})
+    where,
   })
+}
 
-export const blocksAfter = ({ after, limit = 15, address }) =>
-  DB.Block.findAndCountAll({
+export const blocksAfter = ({ after, limit = 15, addresses = [] }) => {
+  const where = { blockHeight: { [Op.gte]: after } }
+  if (addresses && addresses.length > 0) {
+    where['blockHeader.proposerAddress'] = { [Op.in]: addresses }
+  }
+  return DB.Block.findAndCountAll({
     attributes: BLOCK_LIST_ATTRIBUTES,
     order: [['blockHeight', 'ASC']],
     limit,
-    where: Object.assign({ blockHeight: { [Op.gte]: after } },
-      address ? { 'blockHeader.proposerAddress': address } : {})
+    where,
   })
+}
 
 export const block = async ({ height, hash } = {}) => {
   const attrs = defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'epoch'])
@@ -580,18 +576,8 @@ export const transferList = async ({
 
 export const validatorByConsensusAddress = consensusAddress =>
   DB.Validator.findOne({
-    attributes: [
-      'namadaAddress',
-      'publicKey',
-      'consensusAddress',
-      'metadata'
-    ],
-    where: {
-      [Op.or]: [
-        { consensusAddress },
-        { pastConsensusAddresses: { [Op.contains]: [consensusAddress] } }
-      ]
-    }
+    attributes: [ 'namadaAddress', 'publicKey', 'consensusAddress', 'metadata' ],
+    where: { consensusAddress }
   })
 
 export const validatorsTop = ({ limit = 15 } = {}) =>
@@ -602,13 +588,18 @@ export const validatorsTop = ({ limit = 15 } = {}) =>
     offset: 0,
   })
 
-export const validatorPublicKeyToConsensusAddresses = async (publicKey) =>
-  publicKey
-    ? await DB.Validator.findOne({
-        attributes: { include: [ 'consensusAddress', 'pastConsensusAddresses' ] },
-        where: { publicKey }
-      }).then(v=>v.get())
-    : {}
+export const validatorPublicKeyToConsensusAddresses = async (publicKey) => {
+  const addresses = new Set()
+  if (publicKey) {
+    const records = await DB.Validator.findall({
+      attributes: { include: [ 'consensusAddress' ] },
+      where: { publicKey }
+    })
+    for (const record of records) {
+      addresses.add(record.consensusAddress)
+    }
+  }
+}
 
 export const defaultAttributes = (args = {}) => {
   const attrs = { exclude: ['createdAt', 'updatedAt'] }

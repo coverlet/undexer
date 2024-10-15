@@ -310,13 +310,7 @@ export function withConsole (handler) {
 }
 
 async function getEpochForValidators (req) {
-  let { epoch } = req.query
-  epoch = Number(epoch)
-  if (isNaN(epoch)) epoch = (await DB.Validator.findOne({
-    attributes: { include: [ 'epoch' ] },
-    order: [['epoch','DESC']]
-  })).get().epoch
-  return epoch
+  return await DB.latestEpochForValidators(req?.query?.epoch)
 }
 
 // Read limit/offset from query parameters and apply defaults

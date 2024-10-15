@@ -18,6 +18,15 @@ export const totalBlocks = () =>
 export const latestEpoch = () =>
   DB.Block.max('epoch')
 
+export const latestEpochForValidators = async (epoch) => {
+  epoch = Number(epoch)
+  if (isNaN(epoch)) epoch = (await DB.Validator.findOne({
+    attributes: { include: [ 'epoch' ] },
+    order: [['epoch','DESC']]
+  })).get().epoch
+  return epoch
+}
+
 export const latestBlock = () =>
   DB.Block.max('blockHeight')
 
@@ -25,7 +34,7 @@ export const oldestBlock = () =>
   DB.Block.min('blockHeight')
 
 export const totalValidators = async (epoch) =>
-  DB.Validator.count({ where: { epoch: epoch ?? await latestEpoch() } })
+  DB.Validator.count({ where: { epoch: await latestEpochForValidators(epoch) } })
 
 export const overview = ({ limit = 10 } = {}) => intoRecord({
   totalBlocks,

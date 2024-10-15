@@ -102,7 +102,7 @@ export const routes = [
 
   ['/validators', async function dbValidators (req, res) {
     const { limit, offset } = pagination(req)
-    const epoch = await getEpoch(req)
+    const epoch = await getEpochForValidators(req)
     const { state } = req.query
     const where = { epoch }
     if (state) where['state.state'] = state
@@ -116,7 +116,7 @@ export const routes = [
   }],
 
   ['/validators/states', async function dbValidatorStates (req, res) {
-    const epoch = await getEpoch(req)
+    const epoch = await getEpochForValidators(req)
     const states = {}
     for (const validator of await DB.Validator.findAll({
       where: { epoch },
@@ -132,8 +132,6 @@ export const routes = [
     const publicKey = req.query.publicKey
     const where = { publicKey }
     const attrs = Query.defaultAttributes({ exclude: ['id'] })
-    //const order = [['epoch','DESC']]
-    //const validatorRecords = await DB.Validator.findAll({ where, order, attributes: attrs })
     let validator = await DB.Validator.findOne({ where, attributes: attrs });
     if (validator === null) {
       return res.status(404).send({ error: 'Validator not found' })
@@ -311,10 +309,13 @@ export function withConsole (handler) {
   }
 }
 
-async function getEpoch (req) {
+async function getEpochForValidators (req) {
   let { epoch } = req.query
   epoch = Number(epoch)
-  if (isNaN(epoch)) epoch = await Query.latestEpoch()
+  if (isNaN(epoch)) epoch = (await DB.Validator.findOne({
+    attributes: { include: [ 'epoch' ] },
+    order: [['epoch','DESC']]
+  })).get().epoch
   return epoch
 }
 

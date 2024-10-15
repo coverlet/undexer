@@ -129,8 +129,9 @@ export const routes = [
   }],
 
   ['/validator', async function dbValidatorByHash (req, res) {
+    const epoch = await getEpochForValidators(req)
     const publicKey = req.query.publicKey
-    const where = { publicKey }
+    const where = { publicKey, epoch }
     const attrs = Query.defaultAttributes({ exclude: ['id'] })
     let validator = await DB.Validator.findOne({ where, attributes: attrs });
     if (validator === null) {
@@ -310,7 +311,7 @@ export function withConsole (handler) {
 }
 
 async function getEpochForValidators (req) {
-  return await DB.latestEpochForValidators(req?.query?.epoch)
+  return await Query.latestEpochForValidators(req?.query?.epoch)
 }
 
 // Read limit/offset from query parameters and apply defaults

@@ -129,7 +129,8 @@ export const routes = [
   }],
 
   ['/validator', async function dbValidatorByHash (req, res) {
-    const where = { publicKey: req.query.publicKey }
+    const publicKey = req.query.publicKey
+    const where = { publicKey }
     const attrs = Query.defaultAttributes({ exclude: ['id'] })
     //const order = [['epoch','DESC']]
     //const validatorRecords = await DB.Validator.findAll({ where, order, attributes: attrs })
@@ -139,7 +140,7 @@ export const routes = [
     }
     validator = { ...validator.get() }
     validator.metadata ??= {}
-    const consensusAddresses = await DB.validatorPublicKeyToConsensusAddresses(publicKey)
+    const consensusAddresses = await Query.validatorPublicKeyToConsensusAddresses(publicKey)
     const lastSignedBlocks = []
     let uptime, currentHeight, countedBlocks
     if ('uptime' in req.query) {

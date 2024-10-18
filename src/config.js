@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config"
 export const DEFAULT_PAGE_SIZE  = process.env.DEFAULT_PAGE_SIZE || 25
-export const CHAIN_ID           = process.env.CHAIN_ID          || 'housefire-reduce.e51ecf4264fc3'
+export const CHAIN_ID           = process.env.CHAIN_ID          || 'housefire-cotton.d3c912fee7462'
 export const DATABASE_USER      = process.env.DATABASE_USER     || 'postgres'
 export const DATABASE_PASS      = process.env.DATABASE_PASS     || 'insecure'
 export const DATABASE_HOST      = process.env.DATABASE_HOST     || 'localhost'

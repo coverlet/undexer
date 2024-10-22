@@ -38,13 +38,13 @@ export class Updater {
 
   async updateValidators (inputs, epoch) {
     this.log("Updating", inputs.length, "validator(s)")
-    await DB.default.transaction(transaction=>runParallel({
+    await runParallel({
       max: 50, inputs, process: validator => {
         validator = Object.assign(validator, { epoch, consensusAddress: validator.address })
         console.log({validator})
-        return DB.Validator.upsert(validator, { transaction })
+        return DB.Validator.upsert(validator)
       }
-    }))
+    })
   }
 
   async updateValidator (address, epoch) {

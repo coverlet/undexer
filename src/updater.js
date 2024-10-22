@@ -40,9 +40,9 @@ export class Updater {
     this.log("Updating", inputs.length, "validator(s)")
     await Promise.all(inputs.map(async validator => {
       validator = Object.assign(validator, { epoch, consensusAddress: validator.address })
-      console.log('Updating validator', validator)
+      console.log('Updating validator', validator.namadaAddress)
       await DB.Validator.upsert(validator, { logging: console.log })
-      console.log('Updated validator', validator)
+      console.log('Updated validator', validator.namadaAddress)
     }))
   }
 
@@ -95,8 +95,12 @@ export class Updater {
 
     // Populate stake for updated validators
     if (updatedValidators.size > 0) {
-      const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
-      await this.updateValidators(validators, epoch)
+      this.log.warn(
+        `!!! ${updatedValidators.size} validator(s) updated in this block.`+
+        ` This will be reflected on next epoch.`
+      )
+      //const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
+      //await this.updateValidators(validators, epoch)
     }
 
     // Update proposals tha don't have stored results
@@ -142,7 +146,7 @@ export class Updater {
       case "tx_remove_validator.wasm":
       case "tx_unbond.wasm":
       case "tx_unjail_validator.wasm": {
-        this.log(`Block ${height} (epoch ${epoch}): Will update validator`, txData.validator)
+        this.log(`Block ${height} (epoch ${epoch}): update to validator`, txData.validator)
         updatedValidators.add(txData.validator)
         break
       }

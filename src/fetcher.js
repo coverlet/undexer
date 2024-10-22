@@ -45,7 +45,7 @@ export class Fetcher {
     const iterator   = this.chain.fetchValidatorsIter({ epoch: Number(epoch), addresses: inputs })
     const process    = async _ => (await iterator.next()).value
     const validators = await runParallel({ max: 50, inputs, process })
-    console.log({validators})
+    //console.log({validators})
     return validators
   }
 

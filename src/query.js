@@ -23,7 +23,7 @@ export const latestEpochForValidators = async (epoch) => {
   if (isNaN(epoch)) epoch = (await DB.Validator.findOne({
     attributes: { include: [ 'epoch' ] },
     order: [['epoch','DESC']]
-  })).get().epoch
+  }))?.get().epoch
   return epoch
 }
 

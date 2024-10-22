@@ -1,4 +1,3 @@
-//deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
 import { START_BLOCK, ALLOW_INCOMPLETE } from './config.js'
 import { Updater } from './updater.js'
@@ -11,17 +10,20 @@ console.debug = () => {}
 
 /** Main indexer controller. */
 export class Indexer {
-  constructor ({ ws, chain }) {
+  constructor ({ chain, proxyApi, nodeApi } = {}) {
     this.chain     = chain
     console.debug = this.chain.log.debug = this.chain.connections[0].log.debug = () => {}
     this.updater   = new Updater(console, chain)
-    this.remote    = new RemoteControl(chain, ws)
+    this.remote    = new RemoteControl({ chain, proxyApi, nodeApi })
     this.block     = new BlockIndexer(this.updater, this.chain, 0, START_BLOCK||0)
     this.epoch     = new EpochIndexer(this.updater, this.remote, chain, 0, 0)
   }
 
   async run () {
-    await this.remote.socket.connect()
+    await Promise.all([
+      this.remote.proxyWs.connect(),
+      this.remote.nodeWs.connect()
+    ])
     console('Connected. Starting from block', this.block.inDB)
     this.block.run()
     this.epoch.run()

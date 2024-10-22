@@ -1,32 +1,41 @@
+//deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
 const console = new Console('')
 
+/** Remote control for node and node-out proxy. */
 export class RemoteControl {
-  constructor (chain, ws, api = 'http://node-out:25552/') {
-    this.api = api
-    this.ws = ws
+  constructor ({
+    chain,
+    proxyApi = 'http://node-out:25552/',
+    nodeApi  = 'http://node:25551'
+  } = {}) {
+    this.proxyApi = proxyApi
+    const proxyWs = Object.assign(new URL(proxyApi), { protocol: 'ws:' }).href
+    this.proxyWs  = new ReconnectingWebSocket(proxyWs)
+
+    this.nodeApi = nodeApi
+    const nodeWs = Object.assign(new URL(nodeApi), { protocol: 'ws:' }).href
+    this.nodeWs  = new ReconnectingWebSocket(nodeWs)
 
     this.chain = chain
     this.chain.log.debug = () => {}
     this.chain.connections[0].log.debug = () => {}
-    this.socket = new ReconnectingWebSocket(ws)
   }
 
   async isPaused () {
-    const status = await (await fetch(this.api)).json()
+    const status = await (await fetch(this.proxyApi)).json()
     return !status
   }
 
   async resume () {
-    const socket = await this.socket.socket
     console.log('Resume sync')
-    socket.send(JSON.stringify({resume:{}}))
+    ;(await this.proxyWs.socket).send(JSON.stringify({resume:{}}))
   }
 
   async restart () {
-    const socket = await this.socket.socket
     console.log('Restart sync')
-    socket.send(JSON.stringify({restart:{}, resume:{}}))
+    ;(await this.nodeWs.socket).send(JSON.stringify({restart:{}}))
+    await this.resume()
   }
 }
 
@@ -63,7 +72,7 @@ export class ReconnectingWebSocket {
           this.socket = this.connect(backoff + 250)
         })
 
-        socket.addEventListener('message', message => {})
+        //socket.addEventListener('message', message => {})
 
       } catch (e) {
         console.error(e)

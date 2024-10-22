@@ -38,10 +38,11 @@ export class Updater {
 
   async updateValidators (inputs, epoch) {
     this.log("Updating", inputs.length, "validator(s)")
-    await Promise.all(inputs.map(validator => {
+    await Promise.all(inputs.map(async validator => {
       validator = Object.assign(validator, { epoch, consensusAddress: validator.address })
-      console.log({validator})
-      return DB.Validator.upsert(validator)
+      console.log('Updating validator', validator)
+      await DB.Validator.upsert(validator)
+      console.log('Updated validator', validator)
     }))
   }
 

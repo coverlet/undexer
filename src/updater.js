@@ -33,7 +33,7 @@ export class Updater {
     const otherVals  = await this.fetcher.fetchValidators(otherAddrs, epoch)
     await this.updateValidators(otherVals, epoch)
     this.log('Epoch', epoch, `updated`, otherVals.length,
-             `validators total in`, ((performance.now()-t0)/1000).toFixed(3), 's')
+             `other validators in`, ((performance.now()-t0)/1000).toFixed(3), 's')
   }
 
   async updateValidators (inputs, epoch) {

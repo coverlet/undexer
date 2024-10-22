@@ -15,6 +15,12 @@ const db = new Sequelize(DATABASE_URL, {
   logging: () => console.log,
   logQueryParameters: true,
   supportBigNumbers: true,
+  dialectOptions: {
+    application_name: 'undexer',
+    keepAlive: true,
+    statement_timeout: 60000,
+    idle_in_transaction_session_timeout: 120000,
+  }
 })
 
 let dbName

@@ -28,12 +28,12 @@ export class RemoteControl {
   }
 
   async resume () {
-    console.log('Resume sync')
+    console.log('🟢 Resume sync')
     ;(await this.proxyWs.socket).send(JSON.stringify({resume:{}}))
   }
 
   async restart () {
-    console.log('Restart sync')
+    console.log('🟠 Restart sync')
     ;(await this.nodeWs.socket).send(JSON.stringify({restart:{}}))
     await this.resume()
   }

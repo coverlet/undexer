@@ -53,7 +53,7 @@ export class EpochCounter extends Counter {
   }
   updateInDB () {
     return retryForever(1000, async () => {
-      return this.inDB    = BigInt(await Query.latestEpoch()||0)
+      return this.inDB    = BigInt(await Query.latestEpochForValidators()||0)
     })
   }
   updateOnChain () {

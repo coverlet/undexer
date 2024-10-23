@@ -206,12 +206,13 @@ export class Updater {
         : await this.fetcher.chain.fetchBondWithSlashing(vote.delegator, vote.validator, epoch)
     }) })
     this.log('Epoch', epoch, 'block', height, 'proposal', id, 'storing', votes.length, 'votes')
-    await DB.default.transaction(async transaction=>{
+    const transaction = undefined
+    //await DB.default.transaction(async transaction=>{
       await DB.Vote.destroy({ where: { proposal: id } }, {transaction})
       for (const vote of votes) {
         await DB.Vote.upsert({ ...vote, proposal: id }, {transaction})
       }
-    })
+    //})
     this.log('Epoch', epoch, 'block', height, 'proposal', id, 'updated with', votes.length, 'votes')
   }
 

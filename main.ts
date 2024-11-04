@@ -1,12 +1,23 @@
+//@ts-types='./fadroma/toolbox/cmds/cmds.ts'
 import Commands from "@hackbg/cmds"
 import { bold } from "@hackbg/logs"
-import EventEmitter from 'node:events'
+import type { Console } from "@hackbg/logs"
+import process from 'node:process'
+//@ts-types='./fadroma/packages/namada/Namada.ts'
+import type { Validator } from "@fadroma/namada"
 
+// For examples how to define commands, see:
+// https://github.com/hackbg/fadroma/blob/v2/packages/namada/namada.ts
+//
+// Note that in this module it is preferable to use dynamic imports
+// at the top of each command rather than all at the top of the file,
+// so that temporary breakage in one code path does not break
+// potentially unrelated entrypoints.
 export default class UndexerCommands extends Commands {
-  // see https://github.com/hackbg/fadroma/blob/v2/packages/namada/namada.ts
-  // for examples how to define commands
 
-  constructor (...args) {
+  declare log: Console // FIXME
+
+  constructor (...args: ConstructorParameters<typeof Commands>) {
     super(...args)
     this.log.label = ''
   }
@@ -84,7 +95,7 @@ export default class UndexerCommands extends Commands {
   }, async (height?: number) => {
     const t0 = performance.now()
     const { default: getRPC } = await import('./src/rpc.js')
-    const chain = await getRPC(height)
+    const chain = await getRPC()
     // Fetch and decode block
     const block = await chain.fetchBlock({ height })
     height ??= block.height
@@ -107,9 +118,9 @@ export default class UndexerCommands extends Commands {
     args: '[HEIGHT]'
   }, async (height?: number) => {
     const t0 = performance.now()
-    const { updateBlock } = await import('./src/block.js')
+    const { Updater } = await import('./src/updater.js')
     const { default: getRPC } = await import('./src/rpc.js')
-    const chain = await getRPC(height)
+    const chain = await getRPC()
     // Fetch and decode block
     const block = await chain.fetchBlock({ height })
     height ??= block.height
@@ -127,7 +138,8 @@ export default class UndexerCommands extends Commands {
     const { default: db } = await import('./src/db.js')
     await db.sync()
     this.log.br().log('Saving block', height, 'to database...').br()
-    await updateBlock({ chain, height, block, })
+    const updater = new Updater({ log: this.log, chain })
+    await updater.updateBlock({ height, block, })
     this.log.info('Done in', performance.now() - t0, 'msec')
   })
 
@@ -142,7 +154,7 @@ export default class UndexerCommands extends Commands {
       epoch,
       tendermintMetadata: false,
       namadaMetadata:     false,
-    })).map(v=>v.namadaAddress).sort()
+    })).map((v: Validator)=>v.namadaAddress).sort()
     if (epoch) {
       this.log.log(`Validators at epoch ${epoch}:`)
     } else {
@@ -151,12 +163,12 @@ export default class UndexerCommands extends Commands {
     for (const address of addresses) {
       this.log.log('Validator:', address)
     }
-    if (epoch) {
-      this.log.log(addresses.length, `validator(s) at epoch`, epoch)
-    } else {
-      this.log.log(addresses.length, 'validator(s) at current epoch.')
-    }
-    this.log.br().info("Use the 'validators fetch all' command to get details.")
+    this.log
+      .log(addresses.length, epoch
+        ? `validator(s) at epoch ${epoch}`
+        : `validator(s) at current epoch`)
+      .br()
+      .info("Use the 'validators fetch all' command to get details.")
   })
 
   validatorsFetchAll = this.command({
@@ -166,11 +178,11 @@ export default class UndexerCommands extends Commands {
     const { default: getRPC } = await import('./src/rpc.js')
     const chain = await getRPC()
     const validators = Object.values(await chain.fetchValidators())
-    const states = {}
+    const states: Record<string, number> = {}
     for (const validator of validators) {
       this.log.br().log(validator)
-      states[validator.state?.state]??=0
-      states[validator.state?.state]++
+      states[(validator as Validator).state?.state]??=0
+      states[(validator as Validator).state?.state]++
     }
     this.log.br().info(validators.length, "validators.")
     for (const [state, count] of Object.entries(states)) {
@@ -184,9 +196,9 @@ export default class UndexerCommands extends Commands {
   }, async () => {
     const { default: getRPC } = await import('./src/rpc.js')
     const chain = await getRPC()
-    const { updateValidators } = await import('./src/validator.js')
-    const validators = await updateValidators(chain)
-    for (const i in validators) {
+    const { Updater } = await import('./src/updater.js')
+    const validators = await new Updater({ chain }).updateAllValidators(chain)
+    for (const i in validators||[]) {
       console.log(`#${Number(i)+1}:`, validators[i])
     }
   })
@@ -194,7 +206,7 @@ export default class UndexerCommands extends Commands {
   validatorsStates = this.command({
     name: 'validators states',
     info: 'count validators in database by state'
-  }, async (height: number) => {
+  }, async () => {
     const { callRoute, dbValidatorStates } = await import('./src/routes.js')
     const states = await callRoute(dbValidatorStates)
     console.log({states})
@@ -203,7 +215,7 @@ export default class UndexerCommands extends Commands {
   validatorsQuery = this.command({
     name: 'validators query',
     info: 'query validators from db'
-  }, async (height: number) => {
+  }, async () => {
     const { validatorsTop } = await import('./src/query.js')
     const validators = (await validatorsTop()).map(x=>x.toJSON());
     console.log(validators)
@@ -212,8 +224,8 @@ export default class UndexerCommands extends Commands {
     for (const { publicKey } of validators) {
       console.log(await new Promise((resolve, reject)=>dbValidatorByHash(
         { query: { publicKey, uptime: 100 } },
-        { status: code => ({
-            send: (data) => (code===200)
+        { status: (code: number) => ({
+            send: (data: unknown) => (code===200)
               ? resolve(data)
               : reject(Object.assign(new Error(`route returned ${code}`), data))
           }) } )))
@@ -226,7 +238,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS',
   }, async (address: string) => {
     const { becomeValidatorCount, becomeValidatorList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await becomeValidatorCount({ address }),
            'becomeValidator(s) for', bold(address))
@@ -240,7 +252,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS',
   }, async (validator: string) => {
     const { changeValidatorMetadataCount, changeValidatorMetadataList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await changeValidatorMetadataCount({ validator }),
            'changeValidatorMetadata(s) for', bold(validator))
@@ -254,7 +266,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS',
   }, async (address: string) => {
     const { deactivateValidatorCount, deactivateValidatorList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await deactivateValidatorCount({ address }),
            'deactivateValidator(s) for', bold(address))
@@ -275,12 +287,11 @@ export default class UndexerCommands extends Commands {
   proposalCount = this.command({
     name: 'proposal count',
     info: 'fetch count of proposals from chain'
-  }, (id: string) =>
-    import('./src/rpc.js')
-      .then(({ default: getRPC })=>getRPC())
-      .then(chain=>chain.fetchProposalCount())
-      .then((count)=>this.log
-        .log('Proposals on chain:', count)))
+  }, () => import('./src/rpc.js')
+    .then(({ default: getRPC })=>getRPC())
+    .then(chain=>chain.fetchProposalCount())
+    .then((count)=>this.log
+      .log('Proposals on chain:', count)))
 
   proposalFetch = this.command({
     name: 'proposal fetch',
@@ -337,8 +348,9 @@ export default class UndexerCommands extends Commands {
     info: 'fetch and store proposal from chain'
   }, async (id: string) => {
     const chain = await import('./src/rpc.js').then(({ default: getRPC })=>getRPC())
-    const { updateProposal } = await import('./src/proposal.js')
-    await updateProposal(chain, id)
+    const { Updater } = await import('./src/updater.js')
+    const updater = new Updater({ chain })
+    await updater.updateProposal(id)
   })
 
   epoch = this.command({
@@ -352,7 +364,7 @@ export default class UndexerCommands extends Commands {
         height: (height === undefined) ? undefined : Number(height)
       }))
       .then(this.log)
-      .catch(this.error))
+      .catch(this.log.error))
 
   transfersBy = this.command({
     name: 'transfers by',
@@ -371,7 +383,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS'
   }, async (source: string) => {
     const { bondCount, bondList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await bondCount({ source }), 'bond(s) from', bold(source))
       .log(await bondList({ source }))
@@ -384,7 +396,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS'
   }, async (validator: string) => {
     const { bondCount, bondList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await bondCount({ validator }), 'bond(s) to', bold(validator))
       .log(await bondList({ validator }))
@@ -397,7 +409,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS'
   }, async (source: string) => {
     const { unbondCount, unbondList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await unbondCount({ source }), 'unbond(s) from', bold(source))
       .log(await unbondList({ source }))
@@ -410,7 +422,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS'
   }, async (validator: string) => {
     const { unbondCount, unbondList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await unbondCount({ validator }), 'unbond(s) to', bold(validator))
       .log(await unbondList({ validator }))
@@ -428,13 +440,14 @@ export default class UndexerCommands extends Commands {
     const txs = await Transaction.findAll({ where, attributes })
     const blocks = new Set(txs.map(tx=>tx.get().blockHeight).filter(height=>height>=minHeight))
     this.log(blocks.size, 'blocks containing transaction')
-    const { updateBlock } = await import('./src/block.js')
+    const { Updater } = await import('./src/updater.js')
     const chain = await import('./src/rpc.js').then(({ default: getRPC })=>getRPC())
     for (const height of [...new Set(blocks)].sort()) {
       while (true) {
         this.log('Reindexing block', height)
         try {
-          await updateBlock({ chain, height })
+          const updater = new Updater({ chain })
+          await updater.updateBlock({ height, block: undefined })
           break
         } catch (e) {
           console.error(e)
@@ -451,7 +464,7 @@ export default class UndexerCommands extends Commands {
     args: 'ADDRESS'
   }, async (address: string) => {
     const { txWithAddressCount, txWithAddressList } = await import('./src/query.js')
-    let t0 = performance.now()
+    const t0 = performance.now()
     this.log
       .log(await txWithAddressCount({ address }), 'tx(s) with', bold(address))
       .log(await txWithAddressList({ address }))

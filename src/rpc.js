@@ -1,5 +1,5 @@
 import * as Namada from "@fadroma/namada";
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { CHAIN_ID, RPC_URL } from './config.js';
 
 let rpc

@@ -173,11 +173,12 @@ export default class UndexerCommands extends Commands {
 
   validatorsFetchAll = this.command({
     name: 'validators fetch all',
-    info: 'fetch detailed info about validators'
-  }, async () => {
+    info: 'fetch detailed info about validators',
+    args: '[EPOCH]'
+  }, async (epoch?: string) => {
     const { default: getRPC } = await import('./src/rpc.js')
     const chain = await getRPC()
-    const validators = Object.values(await chain.fetchValidators())
+    const validators = Object.values(await chain.fetchValidators({ epoch }))
     const states: Record<string, number> = {}
     for (const validator of validators) {
       this.log.br().log(validator)

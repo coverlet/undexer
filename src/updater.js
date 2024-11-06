@@ -22,18 +22,13 @@ export class Updater {
   async updateAllValidators (epoch) {
     const t0 = performance.now()
     this.log("Updating validators at epoch", epoch)
-
-    const consAddrs = await this.fetcher.fetchCurrentAndPastConsensusValidatorAddresses(epoch)
-    const consVals  = await this.fetcher.fetchValidators(consAddrs, epoch)
-    await this.updateValidators(consVals, epoch)
-    this.log('Epoch', epoch, `updated`, consVals.length,
-             `consensus validators in`, ((performance.now()-t0)/1000).toFixed(3), 's')
-
-    const otherAddrs = await this.fetcher.fetchRemainingValidatorAddresses(consAddrs, epoch)
-    const otherVals  = await this.fetcher.fetchValidators(otherAddrs, epoch)
-    await this.updateValidators(otherVals, epoch)
-    this.log('Epoch', epoch, `updated`, otherVals.length,
-             `other validators in`, ((performance.now()-t0)/1000).toFixed(3), 's')
+    const addresses  = await this.fetcher.chain.fetchValidatorAddresses(epoch)
+    this.log("Fetching", addresses.length,  "validator(s) at epoch", epoch)
+    const validators = await this.fetcher.fetchValidators(addresses, epoch)
+    this.log("Storing",  validators.length, "validator(s) at epoch", epoch)
+    await this.updateValidators(validators, epoch)
+    this.log("Updated",  validators.length, "validator(s) at epoch", epoch,
+             "in", ((performance.now()-t0)/1000).toFixed(3), 's')
   }
 
   async updateValidators (inputs, epoch) {

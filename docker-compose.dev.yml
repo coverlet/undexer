@@ -7,7 +7,7 @@ services:
   pnpmi:
     user: "root"
     network_mode: host
-    image: oci.hack.bg/undexer:main
+    image: ghcr.io/hackbg/undexer:v4
     build: { context: ., network: host }
     environment: { CI: 1 }
     entrypoint: /bin/sh
@@ -28,7 +28,7 @@ services:
   api:
     network_mode: host
     restart: unless-stopped
-    image: oci.hack.bg/undexer:main
+    image: ghcr.io/hackbg/undexer:v4
     build: { context: ., network: host }
     entrypoint: /app/undexer
     command: api
@@ -51,7 +51,7 @@ services:
   indexer:
     network_mode: host
     restart: unless-stopped
-    image: oci.hack.bg/undexer:main
+    image: ghcr.io/hackbg/undexer:v4
     build: { context: ., network: host }
     entrypoint: /app/undexer
     command: index

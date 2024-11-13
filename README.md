@@ -9,13 +9,17 @@ and [`@hackbg/borshest`](https://github.com/hackbg/toolbox/tree/main/borshest).
 
 ## API reference and endpoints
 
-* **API v3 (beta):** https://undexer-v3.demo.hack.bg/v3/
+For all endpoints available please refer to the [OpenAPI specs](swagger.yaml).
+
+* **API v4 (current):** https://undexer.hack.bg/v4
+  * TODO: changelog
+
+* **API v3 (deprecated):** https://undexer-v3.demo.hack.bg/v3/
   * `/block` endpoint: removed `blockHeader`, added `proposer` and `signers`
 
-* **API v2 (stable):** https://undexer.demo.hack.bg/v2/
-  For all endpoints available please refer to the [OpenAPI specs](swagger.yaml).
+* **API v2 (decommissioned):** https://undexer.demo.hack.bg/v2/
 
-* **API v1 (deprecated).**
+* **API v1 (decommissioned).**
 
 ## Running
 

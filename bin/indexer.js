@@ -16,12 +16,16 @@ console.log('⏳ Syncing DB schema...')
 import db from '../src/db.js'
 import { START_FROM_SCRATCH } from '../src/config.js'
 await db.sync({ force: Boolean(START_FROM_SCRATCH) })
-console.log('🚀 Begin indexing!')
 
-import { CONTROL_URL } from "../src/config.js"
+import { RPC_URL, CONTROL_URL } from "../src/config.js"
 import { Indexer } from '../src/main.js'
 console.log('⏳ Connecting...')
+console.log('⏳ RPC_URL     =', RPC_URL)
+console.log('⏳ CONTROL_URL =', CONTROL_URL)
 
 import getRPC from "../src/rpc.js"
-const indexer = new Indexer({ chain: await getRPC(), ws: CONTROL_URL })
+const chain = await getRPC();
+
+console.log('🚀 Begin indexing!')
+const indexer = new Indexer({ chain, ws: CONTROL_URL })
 indexer.run()

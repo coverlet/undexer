@@ -1,13 +1,14 @@
 //deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
+import { NODE_CONTROL_URL, PROXY_CONTROL_URL } from './config.js'
 const console = new Console('')
 
 /** Remote control for node and node-out proxy. */
 export class RemoteControl {
   constructor ({
     chain,
-    proxyApi = 'http://node-out:25552/',
-    nodeApi  = 'http://node:25551'
+    proxyApi = PROXY_CONTROL_URL,
+    nodeApi  = NODE_CONTROL_URL,
   } = {}) {
     this.proxyApi = proxyApi
     const proxyWs = Object.assign(new URL(proxyApi), { protocol: 'ws:' }).href

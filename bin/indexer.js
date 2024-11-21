@@ -28,5 +28,5 @@ import getRPC from "../src/rpc.js"
 const chain = await getRPC();
 
 console.log('🚀 Begin indexing!')
-const indexer = new Indexer({ chain, ws: CONTROL_URL })
+const indexer = new Indexer({ chain })
 indexer.run()

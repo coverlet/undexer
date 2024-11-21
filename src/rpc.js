@@ -23,7 +23,6 @@ async function rpcVariant (url) {
       } else {
         console.error(`RPC connect failed (${url}):`, e)
       }
-      console.info('Retrying in 1s')
       await new Promise(resolve=>setTimeout(resolve, 1000))
     }
   }

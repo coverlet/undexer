@@ -1,5 +1,5 @@
 import { Console } from '@fadroma/namada'
-import { START_BLOCK, ALLOW_INCOMPLETE } from './config.js'
+import { START_BLOCK, ALLOW_INCOMPLETE, NODE_CONTROL_URL, PROXY_CONTROL_URL } from './config.js'
 import { Updater } from './updater.js'
 import { RemoteControl } from './remote.js'
 import { BlockCounter, EpochCounter } from './counter.js'
@@ -10,7 +10,11 @@ console.debug = () => {}
 
 /** Main indexer controller. */
 export class Indexer {
-  constructor ({ chain, proxyApi, nodeApi } = {}) {
+  constructor ({
+    chain,
+    proxyApi = PROXY_CONTROL_URL,
+    nodeApi  = NODE_CONTROL_URL,
+  } = {}) {
     this.chain     = chain
     console.debug = this.chain.log.debug = this.chain.connections[0].log.debug = () => {}
     this.updater   = new Updater(console, chain)

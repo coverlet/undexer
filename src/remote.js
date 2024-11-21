@@ -24,7 +24,7 @@ export class RemoteControl {
   }
 
   async isPaused () {
-    const status = await (await fetch(this.proxyApi)).json()
+    const status = (await (await fetch(this.proxyApi)).json()).canConnect
     return !status
   }
 

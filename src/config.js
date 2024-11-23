@@ -2,7 +2,7 @@
 import "dotenv/config"
 import process from "node:process"
 export const DEFAULT_PAGE_SIZE  = process.env.DEFAULT_PAGE_SIZE || 25
-export const CHAIN_ID           = process.env.CHAIN_ID          || 'housefire-cotton.d3c912fee7462'
+export const CHAIN_ID           = process.env.CHAIN_ID          || 'namada-dryrun.abaaeaf7b78cb3ac'
 export const DATABASE_USER      = process.env.DATABASE_USER     || 'postgres'
 export const DATABASE_PASS      = process.env.DATABASE_PASS     || 'insecure'
 export const DATABASE_HOST      = process.env.DATABASE_HOST     || 'localhost'

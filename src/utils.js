@@ -87,7 +87,7 @@ export function withConsole (handler) {
 }
 
 // Read limit/offset from query parameters and apply defaults
-function pagination (req) {
+export function pagination (req) {
   return {
     offset: Math.max(0,   req.query.offset ? Number(req.query.offset) : 0),
     limit:  Math.min(100, req.query.limit  ? Number(req.query.limit)  : DEFAULT_PAGE_SIZE),
@@ -95,7 +95,7 @@ function pagination (req) {
 }
 
 // Read limit/before/after from query parameters and apply defaults
-function relativePagination (req) {
+export function relativePagination (req) {
   return {
     before: Math.max(0,   req.query.before || 0),
     after:  Math.max(0,   req.query.after  || 0),

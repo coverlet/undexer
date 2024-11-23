@@ -1,14 +1,13 @@
+import process from 'node:process'
 import { Console } from "@hackbg/logs"
 import { base64 } from "@hackbg/fadroma";
 import { Sequelize, DataTypes, Op } from "sequelize"
 import PG from "pg"
 import { CHAIN_ID, DATABASE_URL } from "./config.js"
-
 export { Sequelize, DataTypes, Op }
 
 const console = new Console("DB");
-
-const { DATE, TEXT, BLOB, JSONB, INTEGER, ENUM, BOOLEAN } = DataTypes
+const { DATE, TEXT, BLOB, JSONB, INTEGER, BOOLEAN } = DataTypes
 
 const db = new Sequelize(DATABASE_URL, {
   dialect: "postgres",
@@ -23,38 +22,39 @@ const db = new Sequelize(DATABASE_URL, {
   }
 })
 
-let dbName
-try {
-  const { username, password, hostname, port, pathname } = new URL(DATABASE_URL)
-  dbName = pathname.slice(1) || CHAIN_ID
-  console.br().log(`Creating database "${dbName}"...`)
-  const pg = new PG.Client({ user: username, password, host: hostname, port })
-  await pg.connect()
-  await pg.query(`CREATE DATABASE "${dbName}"`)
-} catch (e) {
-  if (e.code === '42P04') {
-    console.info(`Database "${dbName}" exists.`)
-  } else {
-    if (e.code === 'ECONNREFUSED') {
-      console.error(`Connection refused. Make sure Postgres is running at ${e.address}:${e.port}`)
+export default db
+
+export async function initDb () {
+  let dbName
+  try {
+    const { username, password, hostname, port, pathname } = new URL(DATABASE_URL)
+    dbName = pathname.slice(1) || CHAIN_ID
+    console.log(`Creating database "${dbName}"...`)
+    const pg = new PG.Client({ user: username, password, host: hostname, port })
+    await pg.connect()
+    await pg.query(`CREATE DATABASE "${dbName}"`)
+  } catch (e) {
+    if (e.code === '42P04') {
+      console.info(`Database "${dbName}" exists.`)
     } else {
-      console.error(e)
+      if (e.code === 'ECONNREFUSED') {
+        console.error(`Connection refused. Make sure Postgres is running at ${e.address}:${e.port}`)
+      } else {
+        console.error(e)
+      }
+      console.error(`Failed to create database "${dbName}". See above for details.`)
+      process.exit(1)
     }
-    console.error(`Failed to create database "${dbName}". See above for details.`)
-    process.exit(1)
+  }
+  // Allow sorting strings as numbers.
+  // See https://github.com/sequelize/sequelize/discussions/15529#discussioncomment-4601186
+  try {
+    await db.query(`CREATE COLLATION IF NOT EXISTS numeric (provider = icu, locale = 'en-u-kn-true')`)
+  } catch (e) {
+    console.error(e)
+    console.warn('FIXME: CREATE COLLATION threw. This is normal only after first run.')
   }
 }
-
-// Allow sorting strings as numbers.
-// See https://github.com/sequelize/sequelize/discussions/15529#discussioncomment-4601186
-try {
-  await db.query(`CREATE COLLATION IF NOT EXISTS numeric (provider = icu, locale = 'en-u-kn-true')`)
-} catch (e) {
-  console.error(e)
-  console.warn('FIXME: CREATE COLLATION threw. This is normal only after first run.')
-}
-
-export default db
 
 export const IntegerPrimaryKey = (autoIncrement = false) => ({
   type:       INTEGER,

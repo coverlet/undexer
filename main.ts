@@ -118,7 +118,7 @@ export default class UndexerCommands extends Commands {
     args: '[HEIGHT]'
   }, async (height?: number) => {
     const t0 = performance.now()
-    const { Updater } = await import('./src/updater.js')
+    const { Updater } = await import('./src/indexUpdater.js')
     const { default: getRPC } = await import('./src/rpc.js')
     const chain = await getRPC()
     // Fetch and decode block
@@ -197,7 +197,7 @@ export default class UndexerCommands extends Commands {
   }, async () => {
     const { default: getRPC } = await import('./src/rpc.js')
     const chain = await getRPC()
-    const { Updater } = await import('./src/updater.js')
+    const { Updater } = await import('./src/indexUpdater.js')
     const validators = await new Updater({ chain }).updateAllValidators(chain)
     for (const i in validators||[]) {
       console.log(`#${Number(i)+1}:`, validators[i])
@@ -349,7 +349,7 @@ export default class UndexerCommands extends Commands {
     info: 'fetch and store proposal from chain'
   }, async (id: string) => {
     const chain = await import('./src/rpc.js').then(({ default: getRPC })=>getRPC())
-    const { Updater } = await import('./src/updater.js')
+    const { Updater } = await import('./src/indexUpdater.js')
     const updater = new Updater({ chain })
     await updater.updateProposal(id)
   })
@@ -441,7 +441,7 @@ export default class UndexerCommands extends Commands {
     const txs = await Transaction.findAll({ where, attributes })
     const blocks = new Set(txs.map(tx=>tx.get().blockHeight).filter(height=>height>=minHeight))
     this.log(blocks.size, 'blocks containing transaction')
-    const { Updater } = await import('./src/updater.js')
+    const { Updater } = await import('./src/indexUpdater.js')
     const chain = await import('./src/rpc.js').then(({ default: getRPC })=>getRPC())
     for (const height of [...new Set(blocks)].sort()) {
       while (true) {

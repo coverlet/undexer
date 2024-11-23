@@ -94,7 +94,7 @@ routes['/tx/:txHash'] = async function dbTransaction (req, res) {
 
 routes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
-  const epoch = await getEpochForValidators(req)
+  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const { state } = req.query
   const where = { epoch }
   if (state) where['state.state'] = state
@@ -108,7 +108,7 @@ routes['/validators'] = async function dbValidators (req, res) {
 }
 
 routes['/validators/states'] = async function dbValidatorStates (req, res) {
-  const epoch = await getEpochForValidators(req)
+  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const states = {}
   for (const validator of await DB.Validator.findAll({
     where: { epoch },
@@ -121,7 +121,7 @@ routes['/validators/states'] = async function dbValidatorStates (req, res) {
 }
 
 routes['/validator'] = async function dbValidatorByHash (req, res) {
-  const epoch = await getEpochForValidators(req)
+  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const publicKey = req.query.publicKey
   const where = { publicKey, epoch }
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
@@ -255,8 +255,4 @@ routes['/balances/:address'] = async function dbBalances (req, res) {
     console.error('Error fetching balances:', error);
     res.status(500).send({ error: 'Failed to fetch balances' });
   }
-}
-
-async function getEpochForValidators (req) {
-  return await Query.latestEpochForValidators(req?.query?.epoch)
 }

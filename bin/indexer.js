@@ -18,7 +18,7 @@ import { START_FROM_SCRATCH } from '../src/config.js'
 await db.sync({ force: Boolean(START_FROM_SCRATCH) })
 
 import { RPC_URL, NODE_CONTROL_URL, PROXY_CONTROL_URL } from "../src/config.js"
-import { Indexer } from '../src/main.js'
+import { Indexer } from '../src/index.js'
 console.log('⏳ Connecting...')
 console.log('⏳ RPC_URL           =', RPC_URL)
 console.log('⏳ NODE_CONTROL_URL  =', NODE_CONTROL_URL)

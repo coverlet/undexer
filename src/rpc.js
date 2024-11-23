@@ -1,7 +1,6 @@
 import * as Namada from "@fadroma/namada";
 import { readFile } from "node:fs/promises";
-import { CHAIN_ID, RPC_URL } from './config.js';
-import { filterBigInts } from './utils.js';
+import { RPC_URL } from './config.js';
 
 let rpc
 
@@ -28,62 +27,4 @@ export async function rpcVariant (url) {
     }
   }
   return connection
-}
-
-export async function rpcHeight (_, res) {
-  const chain = await getRPC()
-  res.status(200).send({
-    timestamp: new Date().toISOString(),
-    chainId:   CHAIN_ID,
-    height:    await chain.fetchHeight()
-  })
-}
-
-export async function rpcTotalStaked (_, res) {
-  const chain = await getRPC()
-  res.status(200).send({
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    totalStaked: String(await chain.fetchTotalStaked())
-  })
-}
-
-export async function rpcEpoch (_, res) {
-  const chain = await getRPC()
-  const [epoch, firstBlock, duration] = await Promise.all([
-    chain.fetchEpoch(),
-    chain.fetchEpochFirstBlock(),
-    chain.fetchEpochDuration(),
-  ])
-  res.status(200).send(filterBigInts({
-    timestamp:  new Date().toISOString(),
-    chainId:    CHAIN_ID,
-    epoch:      String(epoch),
-    firstBlock: String(firstBlock),
-    ...duration
-  }))
-}
-
-export async function rpcStakingParameters (_, res) {
-  const chain = await getRPC()
-  const parameters = await chain.fetchStakingParameters();
-  res.status(200).send(filterBigInts(parameters));
-}
-
-export async function rpcGovernanceParameters (_, res) {
-  const chain = await getRPC();
-  const parameters = await chain.fetchGovernanceParameters();
-  res.status(200).send(filterBigInts(parameters));
-}
-
-export async function rpcPGFParameters (_, res) {
-  const chain = await getRPC();
-  const parameters = await chain.fetchPGFParameters();
-  res.status(200).send(filterBigInts(parameters));
-}
-
-export async function rpcProtocolParameters (_, res) {
-  const chain = await getRPC();
-  const param = await chain.fetchProtocolParameters();
-  res.status(200).send(filterBigInts(param));
 }

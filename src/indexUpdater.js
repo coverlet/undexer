@@ -1,7 +1,7 @@
 import { Console } from '@fadroma/namada'
 import * as DB from './db.js'
-import { Fetcher } from './fetcher.js'
-import { runParallel, waitForever } from './utils.js'
+import { Fetcher } from './indexFetcher.js'
+import { runParallel } from './utils.js'
 
 const console = new Console('')
 

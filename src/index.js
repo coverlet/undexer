@@ -1,8 +1,8 @@
 import { Console } from '@fadroma/namada'
 import { START_BLOCK, ALLOW_INCOMPLETE, NODE_CONTROL_URL, PROXY_CONTROL_URL } from './config.js'
-import { Updater } from './updater.js'
-import { RemoteControl } from './remote.js'
-import { BlockCounter, EpochCounter } from './counter.js'
+import { Updater } from './indexUpdater.js'
+import { RemoteControl } from './indexRemote.js'
+import { BlockCounter, EpochCounter } from './indexCounter.js'
 import { runForever, retryForever } from './utils.js'
 
 const console = new Console('')

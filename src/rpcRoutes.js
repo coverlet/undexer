@@ -1,8 +1,9 @@
+import express from 'express'
 import { CHAIN_ID } from './config.js'
 import { withConsole } from './utils.js'
-import express from 'express'
 import { filterBigInts } from './utils.js';
 
+// Routes that respond with data queried directly from RPC endpoints.
 export const rpcRoutes = {}
 
 rpcRoutes['/height'] = chain => async function multiRpcHeight (_) {
@@ -81,7 +82,10 @@ rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_)
 }
 
 export default function getRpcRouter (rpcs) {
-  const router = express.Router();
+  return addRpcRoutes(express.Router(), rpcs)
+}
+
+export function addRpcRoutes (router, rpcs) {
   for (const [route, handler] of Object.entries(rpcRoutes)) {
     router.get(route, withConsole(async (req, res) => {
       let result

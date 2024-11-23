@@ -1,19 +1,21 @@
+import express from 'express'
 import { literal } from 'sequelize';
 import * as DB from './db.js';
 import * as RPC from './rpc.js';
 import * as Query from './dbQuery.js';
 import { TOKENS } from './config.js';
-import { pagination, relativePagination } from './utils.js';
+import { pagination, relativePagination, withConsole } from './utils.js';
 
-export const routes = {}
+// Routes that respond with indexed data from the database.
+export const dbRoutes = {}
 
-routes['/'] = async function dbOverview (_req, res) {
+dbRoutes['/'] = async function dbOverview (_req, res) {
   const timestamp = new Date().toISOString()
   const overview = await Query.overview()
   res.status(200).send({ timestamp, chainId, ...overview })
 }
 
-routes['/epochs'] = async function dbEpochs (req, res) {
+dbRoutes['/epochs'] = async function dbEpochs (req, res) {
   const timestamp = new Date().toISOString()
   const { limit, before, after } = relativePagination(req)
   if (before && after) {
@@ -23,25 +25,25 @@ routes['/epochs'] = async function dbEpochs (req, res) {
   res.status(200).send({ timestamp, epochs })
 }
 
-routes['/status'] = async function dbStatus (_req, res) {
+dbRoutes['/status'] = async function dbStatus (_req, res) {
   const timestamp = new Date().toISOString()
   const status = await Query.status()
   res.status(200).send({ timestamp, chainId, ...status })
 }
 
-routes['/search'] = async function dbStatus (_req, res) {
+dbRoutes['/search'] = async function dbStatus (_req, res) {
   const timestamp = new Date().toISOString()
   const status = await Query.status()
   res.status(200).send({ timestamp, chainId, ...status })
 }
 
-routes['/status'] = async function dbStatus (_req, res) {
+dbRoutes['/status'] = async function dbStatus (_req, res) {
   const timestamp = new Date().toISOString()
   const status = await Query.status()
   res.status(200).send({ timestamp, chainId, ...status })
 }
 
-routes['/blocks'] = async function dbBlocks (req, res) {
+dbRoutes['/blocks'] = async function dbBlocks (req, res) {
   const timestamp = new Date().toISOString()
   const { limit, before, after } = relativePagination(req)
   if (before && after) {
@@ -52,7 +54,7 @@ routes['/blocks'] = async function dbBlocks (req, res) {
   res.status(200).send({ timestamp, chainId, ...results })
 }
 
-routes['/block'] = async function dbBlock (req, res) {
+dbRoutes['/block'] = async function dbBlock (req, res) {
   const timestamp = new Date().toISOString()
   const _attrs = /*FIXME*/ Query.defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'blockData'])
   const { height, hash } = req.query
@@ -80,19 +82,19 @@ routes['/block'] = async function dbBlock (req, res) {
   })
 }
 
-routes['/txs'] = async function dbTransactions (req, res) {
+dbRoutes['/txs'] = async function dbTransactions (req, res) {
   const timestamp = new Date().toISOString()
   const { rows, count } = await Query.transactionList(pagination(req))
   res.status(200).send({ timestamp, chainId, count, txs: rows })
 } 
 
-routes['/tx/:txHash'] = async function dbTransaction (req, res) {
+dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
   const tx = await Query.transactionByHash(req.params.txHash);
   if (tx === null) return res.status(404).send({ error: 'Transaction not found' });
   res.status(200).send(tx);
 }
 
-routes['/validators'] = async function dbValidators (req, res) {
+dbRoutes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
   const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const { state } = req.query
@@ -107,7 +109,7 @@ routes['/validators'] = async function dbValidators (req, res) {
   res.status(200).send(result);
 }
 
-routes['/validators/states'] = async function dbValidatorStates (req, res) {
+dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
   const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const states = {}
   for (const validator of await DB.Validator.findAll({
@@ -120,7 +122,7 @@ routes['/validators/states'] = async function dbValidatorStates (req, res) {
   res.status(200).send(states)
 }
 
-routes['/validator'] = async function dbValidatorByHash (req, res) {
+dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const publicKey = req.query.publicKey
   const where = { publicKey, epoch }
@@ -170,7 +172,7 @@ routes['/validator'] = async function dbValidatorByHash (req, res) {
   });
 }
 
-routes['/proposals'] = async function dbProposals (req, res) {
+dbRoutes['/proposals'] = async function dbProposals (req, res) {
   const { limit, offset } = pagination(req)
   const orderBy = req.query.orderBy ?? 'id';
   const orderDirection = req.query.orderDirection ?? 'DESC'
@@ -189,7 +191,7 @@ routes['/proposals'] = async function dbProposals (req, res) {
   })
 }
 
-routes['/proposals/stats'] = async function dbProposalStats (_req, res) {
+dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
   const [all, ongoing, upcoming, finished, passed, rejected] = await Promise.all([
     DB.Proposal.count(),
     DB.Proposal.count({ where: { 'metadata.status': 'ongoing' } }),
@@ -201,7 +203,7 @@ routes['/proposals/stats'] = async function dbProposalStats (_req, res) {
   res.status(200).send({ all, ongoing, upcoming, finished, passed, rejected })
 }
 
-routes['/proposal/:id'] = async function dbProposal (req, res) {
+dbRoutes['/proposal/:id'] = async function dbProposal (req, res) {
   const id = req.params.id
   const result = await DB.Proposal.findOne({ where: { id }, attributes: Query.defaultAttributes(), });
   return result
@@ -209,7 +211,7 @@ routes['/proposal/:id'] = async function dbProposal (req, res) {
     : res.status(404).send({ error: 'Proposal not found' });
 }
 
-routes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
+dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   const { limit, offset } = pagination(req);
   const where = { proposal: req.params.id };
   const attrs = Query.defaultAttributes();
@@ -219,7 +221,7 @@ routes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   res.status(200).send({ count, votes: rows });
 }
 
-routes['/transfers'] = async function dbTransfers (req, res) {
+dbRoutes['/transfers'] = async function dbTransfers (req, res) {
   const { limit, offset } = pagination(req)
   const { address, source, target } = req.query
   const [count, transfers] = await Promise.all([
@@ -229,7 +231,7 @@ routes['/transfers'] = async function dbTransfers (req, res) {
   res.status(200).send({ count, transfers })
 }
 
-routes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
+dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
   const { address } = req.params;
   const { limit, offset } = pagination(req)
   try {
@@ -244,7 +246,7 @@ routes['/transactions/:address'] = async function dbTransactionsForAddress (req,
   }
 }
 
-routes['/balances/:address'] = async function dbBalances (req, res) {
+dbRoutes['/balances/:address'] = async function dbBalances (req, res) {
   const { address } = req.params;
   try {
     const chain = await RPC.default();
@@ -255,4 +257,15 @@ routes['/balances/:address'] = async function dbBalances (req, res) {
     console.error('Error fetching balances:', error);
     res.status(500).send({ error: 'Failed to fetch balances' });
   }
+}
+
+export default function getDbRouter () {
+  return addDbRoutes(express.Router())
+}
+
+export function addDbRoutes (router) {
+  for (const [route, handler] of Object.entries(dbRoutes)) {
+    router.get(route, withConsole(handler))
+  }
+  return router
 }

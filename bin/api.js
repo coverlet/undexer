@@ -3,11 +3,26 @@ import express from 'express';
 import cors from 'cors';
 import sequelize from '../src/db.js';
 import process from 'node:process'
-import router from '../src/routes.js';
-const { SERVER_PORT = 8888 } = process.env
+import { addRpcRoutes } from '../src/rpcRoutes.js';
+const { SERVER_PORT = 8888, RPCS } = process.env
+const rpcUrls = RPCS ? RPCS.split(',').map(x=>x.trim()) : [
+  'https://rpc.namada-dryrun.tududes.com/',
+  'https://namada-rpc.mandragora.io',
+];
+if (rpcUrls.length > 0) {
+  console.log('🪐 Using', rpcUrls.length, 'RPC url(s):')
+  for (const rpcUrl of rpcUrls) console.log('🪐 -', rpcUrl)
+} else {
+  console.error('No RPC URLs configured. Exiting.')
+  process.exit(1)
+}
+const rpcs = rpcUrls.map(rpcVariant)
 console.log(`⏳ Launching server on port ${SERVER_PORT}...`)
 console.log('⏳ Syncing DB schema...')
 await sequelize.sync();
+const router = express.Router();
+addRpcRoutes(router, rpcs)
+addDbRoutes(router)
 express()
   .use(cors())
   .use('/v4', router)

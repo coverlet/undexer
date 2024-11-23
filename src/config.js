@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import "dotenv/config"
+import process from "node:process"
 export const DEFAULT_PAGE_SIZE  = process.env.DEFAULT_PAGE_SIZE || 25
 export const CHAIN_ID           = process.env.CHAIN_ID          || 'housefire-cotton.d3c912fee7462'
 export const DATABASE_USER      = process.env.DATABASE_USER     || 'postgres'
@@ -9,8 +10,8 @@ export const DATABASE_PORT      = process.env.DATABASE_PORT     || '5432'
 export const DATABASE_NAME      = process.env.DATABASE_NAME     || CHAIN_ID
 export const DATABASE_URL       = process.env.DATABASE_URL      || `postgres://${DATABASE_USER}:${DATABASE_PASS}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}`
 export const NODE_CONTROL_URL   = process.env.NODE_CONTROL_URL  || 'http://node:25551'
-export const PROXY_CONTROL_URL  = process.env.PROXY_CONTROL_URL || 'http://node-out:25552'
-export const RPC_URL            = process.env.RPC_URL           || 'http://node-in:26657'
+export const PROXY_CONTROL_URL  = process.env.PROXY_CONTROL_URL || 'http://sync-proxy:25552'
+export const RPC_URL            = process.env.RPC_URL           || 'http://rpc-proxy:26657'
 /// Don't reset the indexing node from scratch if more than 2 epochs out of sync
 export const ALLOW_INCOMPLETE   = Boolean(process.env.ALLOW_INCOMPLETE) || false
 /// Start indexing from this block

@@ -1,6 +1,6 @@
 import { Console } from '@fadroma/namada'
 import { START_BLOCK } from './config.js'
-import * as Query from './query.js'
+import * as Query from './dbQuery.js'
 import { retryForever, maxBigInt } from './utils.js'
 
 const console = new Console('')

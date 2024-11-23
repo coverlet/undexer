@@ -80,7 +80,7 @@ export default class UndexerCommands extends Commands {
     name: 'db queries',
     info: 'test all db queries',
   }, async () => {
-    for (const [name, item] of Object.entries(await import('./src/query.js'))) {
+    for (const [name, item] of Object.entries(await import('./src/dbQuery.js'))) {
       if (typeof item === 'function') {
         this.log.br().log(name)
         this.log(await item())
@@ -217,7 +217,7 @@ export default class UndexerCommands extends Commands {
     name: 'validators query',
     info: 'query validators from db'
   }, async () => {
-    const { validatorsTop } = await import('./src/query.js')
+    const { validatorsTop } = await import('./src/dbQuery.js')
     const validators = (await validatorsTop()).map(x=>x.toJSON());
     console.log(validators)
     const { routes } = await import('./src/routes.js')
@@ -238,7 +238,7 @@ export default class UndexerCommands extends Commands {
     info: 'query tx_become_validator',
     args: 'ADDRESS',
   }, async (address: string) => {
-    const { becomeValidatorCount, becomeValidatorList } = await import('./src/query.js')
+    const { becomeValidatorCount, becomeValidatorList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await becomeValidatorCount({ address }),
@@ -252,7 +252,7 @@ export default class UndexerCommands extends Commands {
     info: 'query tx_change_validator_metadata',
     args: 'ADDRESS',
   }, async (validator: string) => {
-    const { changeValidatorMetadataCount, changeValidatorMetadataList } = await import('./src/query.js')
+    const { changeValidatorMetadataCount, changeValidatorMetadataList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await changeValidatorMetadataCount({ validator }),
@@ -266,7 +266,7 @@ export default class UndexerCommands extends Commands {
     info: 'query tx_deactivate_validator',
     args: 'ADDRESS',
   }, async (address: string) => {
-    const { deactivateValidatorCount, deactivateValidatorList } = await import('./src/query.js')
+    const { deactivateValidatorCount, deactivateValidatorList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await deactivateValidatorCount({ address }),
@@ -372,7 +372,7 @@ export default class UndexerCommands extends Commands {
     info: 'return transfers for given address',
     args: 'ADDRESS'
   }, async (address: string) => {
-    const { transferList } = await import('./src/query.js')
+    const { transferList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     console.log(await transferList({ address }))
     console.log(`Done in ${(performance.now() - t0).toFixed(3)}msec`)
@@ -383,7 +383,7 @@ export default class UndexerCommands extends Commands {
     info: 'return bonds from given source',
     args: 'ADDRESS'
   }, async (source: string) => {
-    const { bondCount, bondList } = await import('./src/query.js')
+    const { bondCount, bondList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await bondCount({ source }), 'bond(s) from', bold(source))
@@ -396,7 +396,7 @@ export default class UndexerCommands extends Commands {
     info: 'return bonds to given validator',
     args: 'ADDRESS'
   }, async (validator: string) => {
-    const { bondCount, bondList } = await import('./src/query.js')
+    const { bondCount, bondList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await bondCount({ validator }), 'bond(s) to', bold(validator))
@@ -409,7 +409,7 @@ export default class UndexerCommands extends Commands {
     info: 'return unbonds from given source',
     args: 'ADDRESS'
   }, async (source: string) => {
-    const { unbondCount, unbondList } = await import('./src/query.js')
+    const { unbondCount, unbondList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await unbondCount({ source }), 'unbond(s) from', bold(source))
@@ -422,7 +422,7 @@ export default class UndexerCommands extends Commands {
     info: 'return unbonds to given validator',
     args: 'ADDRESS'
   }, async (validator: string) => {
-    const { unbondCount, unbondList } = await import('./src/query.js')
+    const { unbondCount, unbondList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await unbondCount({ validator }), 'unbond(s) to', bold(validator))
@@ -464,7 +464,7 @@ export default class UndexerCommands extends Commands {
     info: 'query transactions with given address',
     args: 'ADDRESS'
   }, async (address: string) => {
-    const { txWithAddressCount, txWithAddressList } = await import('./src/query.js')
+    const { txWithAddressCount, txWithAddressList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
       .log(await txWithAddressCount({ address }), 'tx(s) with', bold(address))

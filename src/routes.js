@@ -1,14 +1,10 @@
 import express from 'express';
 import { Console, bold, colors } from '@hackbg/logs';
-import { Op, literal } from 'sequelize';
+import { literal } from 'sequelize';
 import * as DB from './db.js';
 import * as RPC from './rpc.js';
 import * as Query from './query.js';
 import { CHAIN_ID, DEFAULT_PAGE_SIZE, TOKENS } from './config.js';
-
-const NOT_IMPLEMENTED = (_req, _res) => {
-  throw new Error('not implemented')
-}
 
 const chainId = CHAIN_ID
 

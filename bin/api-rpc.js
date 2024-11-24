@@ -5,8 +5,8 @@ import cors from 'cors'
 import { rpcVariant } from '../src/rpc.js'
 import getRpcRouter from '../src/rpcRoutes.js'
 
-const { SERVER_PORT = 8888, RPCS } = process.env
-const rpcUrls = RPCS ? RPCS.split(',').map(x=>x.trim()) : [
+const { SERVER_PORT = 8888, RPC_URLS } = process.env
+const rpcUrls = RPC_URLS ? RPC_URLS.split(',').map(x=>x.trim()) : [
   'https://rpc.namada-dryrun.tududes.com/',
   'https://namada-rpc.mandragora.io',
 ]

@@ -3,8 +3,10 @@ import { literal } from 'sequelize';
 import * as DB from './db.js';
 import * as RPC from './rpc.js';
 import * as Query from './dbQuery.js';
-import { TOKENS } from './config.js';
+import { TOKENS, CHAIN_ID } from './config.js';
 import { pagination, relativePagination, withConsole } from './utils.js';
+
+const chainId = CHAIN_ID
 
 // Routes that respond with indexed data from the database.
 export const dbRoutes = {}

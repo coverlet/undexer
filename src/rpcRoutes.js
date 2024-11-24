@@ -16,11 +16,10 @@ rpcRoutes['/height'] = chain => async function multiRpcHeight (_) {
 }
 
 rpcRoutes['/total-staked'] = chain => async function multiRpcTotalStaked (_) {
-  console.log({chain})
   return {
-    chainId:   CHAIN_ID,
-    rpcUrl:    chain.connections[0].url,
-    timestamp: new Date().toISOString(),
+    chainId:     CHAIN_ID,
+    rpcUrl:      chain.connections[0].url,
+    timestamp:   new Date().toISOString(),
     totalStaked: String(await chain.fetchTotalStaked())
   }
 }
@@ -32,12 +31,12 @@ rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
     chain.fetchEpochDuration(),
   ])
   return {
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
+    timestamp:  new Date().toISOString(),
+    chainId:    CHAIN_ID,
+    rpcUrl:     chain.connections[0].url,
     epoch:      String(epoch),
     firstBlock: String(firstBlock),
-    ...duration
+    ...filterBigInts(duration)
   }
 }
 

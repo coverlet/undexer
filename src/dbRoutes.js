@@ -196,11 +196,11 @@ dbRoutes['/proposals'] = async function dbProposals (req, res) {
 dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
   const [all, ongoing, upcoming, finished, passed, rejected] = await Promise.all([
     DB.Proposal.count(),
-    DB.Proposal.count({ where: { 'metadata.status': 'ongoing' } }),
+    DB.Proposal.count({ where: { 'metadata.status': 'ongoing'  } }),
     DB.Proposal.count({ where: { 'metadata.status': 'upcoming' } }),
     DB.Proposal.count({ where: { 'metadata.status': 'finished' } }),
-    DB.Proposal.count({ where: { 'result.result': 'Passed' } }),
-    DB.Proposal.count({ where: { 'result.result': 'Rejected' } }),
+    DB.Proposal.count({ where: { 'result.result':   'Passed'   } }),
+    DB.Proposal.count({ where: { 'result.result':   'Rejected' } }),
   ])
   res.status(200).send({ all, ongoing, upcoming, finished, passed, rejected })
 }

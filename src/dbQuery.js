@@ -111,10 +111,13 @@ export const blocks = async ({
 }) => {
   let addresses = []
   if (publicKey) {
-    addresses = await validatorPublicKeyToConsensusAddresses(publicKey)
+    addresses = [...await validatorPublicKeyToConsensusAddresses(publicKey)]
     if (addresses.length === 0) return {
-      address: null, publicKey, ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
-      count: 0, blocks: []
+      address: null,
+      publicKey,
+      ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
+      count: 0,
+      blocks: []
     }
   }
   let rows, count
@@ -126,8 +129,11 @@ export const blocks = async ({
     ;({ rows, count } = await blocksLatest({ limit, addresses }))
   }
   return {
-    publicKey, addresses, ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
-    count, blocks: await Promise.all(rows.map(block=>DB.Transaction
+    publicKey,
+    addresses,
+    ...await intoRecord({ totalBlocks, latestBlock, oldestBlock }),
+    count,
+    blocks: await Promise.all(rows.map(block=>DB.Transaction
       .count({ where: { blockHeight: block.blockHeight } })
       .then(transactionCount=>({ ...block.get(), transactionCount }))
     ))
@@ -597,7 +603,11 @@ export const validatorPublicKeyToConsensusAddresses = async (publicKey) => {
     const attributes = { include: [ 'consensusAddress' ] }
     const where = { publicKey }
     const records = await DB.Validator.findAll({ attributes, where })
-    for (const record of records) addresses.add(record.consensusAddress)
+    for (const record of records) {
+      if ((record.consensusAddress||"").trim().length > 0) {
+        addresses.add(record.consensusAddress)
+      }
+    }
   }
   return addresses
 }

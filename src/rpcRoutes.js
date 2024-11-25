@@ -11,7 +11,7 @@ rpcRoutes['/height'] = chain => async function multiRpcHeight (_) {
     chainId:   CHAIN_ID,
     rpcUrl:    chain.connections[0].url,
     timestamp: new Date().toISOString(),
-    height:    await chain.fetchHeight()
+    height:    String(await chain.fetchHeight())
   }
 }
 

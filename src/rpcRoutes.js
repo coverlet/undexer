@@ -1,27 +1,20 @@
 import express from 'express'
-import { CHAIN_ID } from './config.js'
 import { withConsole } from './utils.js'
 import { filterBigInts } from './utils.js';
 
 // Routes that respond with data queried directly from RPC endpoints.
 export const rpcRoutes = {}
 
+const rpcResponseMeta = chain => ({
+  timestamp: new Date().toISOString(), chainId: chain.id, rpcUrl: chain.connections[0].url,
+})
+
 rpcRoutes['/height'] = chain => async function multiRpcHeight (_) {
-  return {
-    chainId:   CHAIN_ID,
-    rpcUrl:    chain.connections[0].url,
-    timestamp: new Date().toISOString(),
-    height:    String(await chain.fetchHeight())
-  }
+  return { ...rpcResponseMeta(chain), height: String(await chain.fetchHeight()) }
 }
 
 rpcRoutes['/total-staked'] = chain => async function multiRpcTotalStaked (_) {
-  return {
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
-    timestamp:   new Date().toISOString(),
-    totalStaked: String(await chain.fetchTotalStaked())
-  }
+  return { ...rpcResponseMeta(chain), totalStaked: String(await chain.fetchTotalStaked()) }
 }
 
 rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
@@ -31,9 +24,7 @@ rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
     chain.fetchEpochDuration(),
   ])
   return {
-    timestamp:  new Date().toISOString(),
-    chainId:    CHAIN_ID,
-    rpcUrl:     chain.connections[0].url,
+    ...rpcResponseMeta(chain),
     epoch:      String(epoch),
     firstBlock: String(firstBlock),
     ...duration
@@ -41,43 +32,19 @@ rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
 }
 
 rpcRoutes['/parameters'] = chain => async function multiRpcProtocolParameters (_) {
-  const parameters = await chain.fetchProtocolParameters();
-  return {
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
-    ...parameters
-  }
+  return { ...rpcResponseMeta(chain), ...await chain.fetchProtocolParameters() }
 }
 
 rpcRoutes['/parameters/staking'] = chain => async function multiRpcStakingParameters (_) {
-  const parameters = await chain.fetchStakingParameters();
-  return {
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
-    ...parameters
-  }
+  return { ...rpcResponseMeta(chain), ...await chain.fetchStakingParameters() }
 }
 
 rpcRoutes['/parameters/governance'] = chain => async function multiRpcGovernanceParameters (_) {
-  const parameters = await chain.fetchGovernanceParameters();
-  return {
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
-    ...parameters
-  }
+  return { ...rpcResponseMeta(chain), ...await chain.fetchGovernanceParameters() }
 }
 
 rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_) {
-  const parameters = await chain.fetchPGFParameters();
-  return {
-    timestamp:   new Date().toISOString(),
-    chainId:     CHAIN_ID,
-    rpcUrl:      chain.connections[0].url,
-    ...parameters
-  }
+  return { ...rpcResponseMeta(chain), ...await chain.fetchPGFParameters() }
 }
 
 export default function getRpcRouter (rpcs) {

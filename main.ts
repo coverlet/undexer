@@ -302,13 +302,13 @@ export default class UndexerCommands extends Commands {
     const chain = await import('./src/rpc.js').then(({ default: getRPC })=>getRPC())
     const data = await chain.fetchProposalInfo(id)
     if (data) {
-      this.log
-        .log('Proposal:', data.proposal)
-        .log('Result:',   data.result)
-      if (data.proposal.type?.type === 'DefaultWithWasm') {
-        const result = await chain.fetchProposalWasm(id)
-        if (result) {
-          this.log.log('WASM:', result.wasm.length, 'bytes')
+      this.log.log('Proposal:', data)
+      const result = await chain.fetchProposalResult(id)
+      this.log.log('Result:',   result)
+      if (data.proposal?.type?.type === 'DefaultWithWasm') {
+        const wasm = await chain.fetchProposalWasm(id)
+        if (wasm) {
+          this.log.log('WASM:', wasm.wasm.length, 'bytes')
         }
       }
       let epoch = await chain.fetchEpoch()
@@ -318,9 +318,9 @@ export default class UndexerCommands extends Commands {
       for (;epoch > 0n; epoch--) {
         const stake = await chain.fetchTotalStaked(epoch)
         this.log.br().log(`Total stake at ${epoch}:`, stake)
-        if (stake === 0n) process.exit(123)
+        const votes = await chain.fetchProposalVotes(id, epoch)
         this.log.br().log(`Votes at ${epoch}:`)
-        for (const vote of data.votes) {
+        for (const vote of votes) {
           while (true) try {
             if (vote.isValidator) {
               vote.power = await chain.fetchValidatorStake(vote.validator, epoch)

@@ -36,7 +36,7 @@ rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
     rpcUrl:     chain.connections[0].url,
     epoch:      String(epoch),
     firstBlock: String(firstBlock),
-    ...filterBigInts(duration)
+    ...duration
   }
 }
 
@@ -46,7 +46,7 @@ rpcRoutes['/parameters'] = chain => async function multiRpcProtocolParameters (_
     timestamp:   new Date().toISOString(),
     chainId:     CHAIN_ID,
     rpcUrl:      chain.connections[0].url,
-    ...filterBigInts(parameters)
+    ...parameters
   }
 }
 
@@ -56,7 +56,7 @@ rpcRoutes['/parameters/staking'] = chain => async function multiRpcStakingParame
     timestamp:   new Date().toISOString(),
     chainId:     CHAIN_ID,
     rpcUrl:      chain.connections[0].url,
-    ...filterBigInts(parameters)
+    ...parameters
   }
 }
 
@@ -66,7 +66,7 @@ rpcRoutes['/parameters/governance'] = chain => async function multiRpcGovernance
     timestamp:   new Date().toISOString(),
     chainId:     CHAIN_ID,
     rpcUrl:      chain.connections[0].url,
-    ...filterBigInts(parameters)
+    ...parameters
   }
 }
 
@@ -76,7 +76,7 @@ rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_)
     timestamp:   new Date().toISOString(),
     chainId:     CHAIN_ID,
     rpcUrl:      chain.connections[0].url,
-    ...filterBigInts(parameters)
+    ...parameters
   }
 }
 
@@ -94,7 +94,7 @@ export function addRpcRoutes (router, rpcs) {
         console.error(e)
         res.status(500).send({ error: e.message })
       }
-      res.status(200).send(result)
+      res.status(200).send(filterBigInts(result))
     }))
   }
   return router

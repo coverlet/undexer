@@ -1,26 +1,24 @@
-import { Console } from '@fadroma/namada'
-import * as DB from './db.js'
 import { Fetcher } from './indexFetcher.js'
-import { runParallel } from './utils.js'
-
-const console = new Console('')
+import * as DB from './db.js'
 
 /** Fetches data using the `Fetcher` and writes it into the `DB`. */
 export class Updater {
-
   constructor (log, chain) {
     this.log     = log
     this.fetcher = new Fetcher({ log, chain })
   }
 
+  /** Log with epoch prefix. */
   logE (epoch, ...args) {
     this.log.log(`Epoch ${String(epoch)}:`, ...args)
   }
 
+  /** Log with epoch and height prefix. */
   logEH (epoch, height, ...args) {
     this.log.log(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
   }
 
+  /** Warn with epoch and height prefix. */
   warnEH (epoch, height, ...args) {
     this.log.warn(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
   }
@@ -38,7 +36,7 @@ export class Updater {
   async updateAllValidators (epoch) {
     const t0 = performance.now()
     this.logE(epoch, "Updating validators")
-    const addresses  = await this.fetcher.chain.fetchValidatorAddresses(epoch)
+    const addresses  = await this.fetcher.fetchValidatorAddresses(epoch)
     this.logE(epoch, "Fetching", addresses.length,  "validator(s)")
     const validators = await this.fetcher.fetchValidators(addresses, epoch)
     this.logE(epoch, "Storing",  validators.length, "validator(s)")
@@ -59,40 +57,36 @@ export class Updater {
       const { namadaAddress, state, stake } = validator
       this.logE(epoch, 'Updating validator', namadaAddress)
       await DB.Validator.upsert(validator, { /*logging: console.log*/ })
-      this.logE(epoch, 'Updated validator', namadaAddress, 'state', state, 'stake', stake)
+      this.logE(epoch, `Updated validator ${namadaAddress} (${state.state}) ${stake}`)
     }))
-  }
-
-  /** Update a single validator by (consensus?) address.
-    * Currently unused. */
-  async updateValidator (address, epoch) {
-    const validator = await this.fetcher.chain.fetchValidator(address, { epoch })
-    await DB.Validator.upsert(Object.assign(validator, { epoch }))
   }
 
   /** Update a single block in the database.
     * Called on block increment. */
   async updateBlock ({ height, block }) {
     const t0 = performance.now()
-
     // If no block was passed, fetch it.
     block ??= await this.fetcher.fetchBlock(height)
-
     // Make sure there isn't a mismatch between required and actual height.
     height = block.height
-
-    // Fetch epoch number and block results
-    const [epoch, blockResults] = await Promise.all([
-      this.fetcher.fetchEpoch(height),
-      this.fetcher.fetchBlockResults(height)
-    ])
+    // Fetch epoch number
+    const epoch = await this.fetcher.fetchEpoch(height)
     this.log.br()
     this.logEH(epoch, height)
-
+    // Fetch block results
+    const blockResults = await this.fetcher.fetchBlockResults(height)
     // Things that need to be updated separately after the block. This is because
     // if we try to fetch them during the block update, the db transaction would time out.
-    const updatedValidators = new Set()
-
+    const { validatorsToUpdate, proposalsToUpdate } = this.findValidatorsAndProposalsToUpdate(
+      epoch, height, block, blockResults
+    )
+    // Fetch data for validators and proposals that were updated during the block.
+    const [updatedValidators, updatedProposals, updatedVotes] = await Promise.all([
+      this.fetcher.fetchValidators([...validatorsToUpdate], epoch),
+      this.fetcher.fetchProposals([...proposalsToUpdate], epoch),
+      this.fetcher.fetchProposalsVotes([...proposalsToUpdate], epoch),
+    ])
+    // TODO: check for governance proposals that were not caught by the above logic
     // Update the block and the contained transaction.
     await DB.default.transaction(async transaction => {
       // Update block record
@@ -107,160 +101,105 @@ export class Updater {
         rpcResponses: block.responses,
         epoch,
       }
+      // Update block data
       await DB.Block.upsert(data, { transaction })
-      // Update transaction records from block
-      for (const tx of block.transactions) await this.updateTx(tx, {
-        epoch, height, blockResults, updatedValidators, transaction
-      })
+      // Update each transaction in block
+      for (const tx of block.transactions) {
+        // Update transaction data
+        this.logEH(epoch, height, `TX ${tx.data?.content?.type}`, tx.id)
+        await DB.Transaction.upsert({
+          chainId:     tx.data.chainId,
+          blockHash:   tx.block.hash,
+          blockTime:   tx.block.time,
+          blockHeight: tx.block.height,
+          txHash:      tx.id,
+          txTime:      tx.data.timestamp,
+          txType:      tx.data.content.type,
+          txContent:   tx.data.content.data,
+          txData:      tx, // TODO deprecate
+        }, { transaction })
+      }
+      // Update validators
+      for (const validator of updatedValidators) {
+        await DB.Validator.upsert(validator, { transaction })
+      }
+      // Update proposals
+      for (const proposal of updatedProposals) {
+        await DB.Proposal.upsert(proposal, { transaction })
+      }
+      // Update votes
+      for (const vote of updatedVotes) {
+        await DB.Vote.upsert(vote, transaction)
+      }
     })
-
-    // Populate stake for updated validators
-    if (updatedValidators.size > 0) {
-      this.warnEH(epoch, height,
-        `!!! ${updatedValidators.size} validator(s) updated in block.`+
-        ` This will be reflected on next epoch.`
-      )
-      //const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
-      //await this.updateValidators(validators, epoch)
-    }
-
-    // Update proposals that don't have stored results
-    await this.updateGovernance(height, epoch)
-
     // Log performed updates.
     const t = performance.now() - t0
     this.logEH(epoch, height, `Added in`, t.toFixed(0), 'msec')
   }
 
-  /** Update a single transaction in the database.
-    * Called from updateBlock for each transaction. */
-  async updateTx (tx, options) {
-    const { epoch, height, transaction, } = options
-    this.logEH(epoch, height, `TX ${tx.data?.content?.type}`, tx.id)
-    await this.updateTxContent(tx, options)
-    await DB.Transaction.upsert({
-      chainId:     tx.data.chainId,
-      blockHash:   tx.block.hash,
-      blockTime:   tx.block.time,
-      blockHeight: tx.block.height,
-      txHash:      tx.id,
-      txTime:      tx.data.timestamp,
-      txType:      tx.data.content.type,
-      txContent:   tx.data.content.data,
-      txData:      tx, // TODO deprecate
-    }, { transaction })
-  }
-
-  /** Update the inner content of a transaction.
-    * Called from updateTx. */
-  async updateTxContent (tx, options) {
-    const { epoch, height, blockResults, updatedValidators, transaction } = options
-    const { type: txType, data: txData } = tx.data?.content || {}
-    if (txType) switch (txType) {
-      case "tx_activate_validator.wasm":
-      case "tx_add_validator.wasm":
-      case "tx_become_validator.wasm":
-      case "tx_bond.wasm":
-      case "tx_change_validator_commission.wasm":
-      case "tx_change_validator_metadata.wasm":
-      case "tx_change_validator_power.wasm":
-      case "tx_deactivate_validator.wasm":
-      case "tx_reactivate_validator.wasm":
-      case "tx_remove_validator.wasm":
-      case "tx_unbond.wasm":
-      case "tx_unjail_validator.wasm": {
-        this.logEH(epoch, height, `Need to update validator`, txData.validator)
-        updatedValidators.add(txData.validator)
-        break
-      }
-      case "tx_init_proposal.wasm": {
-        const { content, ...metadata } = txData || {}
-        const id = findProposalId(blockResults.endBlockEvents, tx.id)
-        if (id) {
-          this.logEH(epoch, height, `New proposal`, id)
-          const data = { id, content, metadata, initTx: tx.id }
-          await DB.Proposal.upsert(data, {transaction})
-        } else {
-          this.warnEH(epoch, height, `New proposal, unknown id`)
-          //await this.updateGovernance()
+  /** Find validators and proposals in the a block that need to be updated.
+    * Called from updateBlock. */
+  findValidatorsAndProposalsToUpdate (epoch, height, block, blockResults) {
+    const validatorsToUpdate = new Set()
+    const proposalsToUpdate  = new Set()
+    for (const tx of block.transactions) {
+      const { type: txType, data: txData } = tx.data?.content || {}
+      if (txType) switch (txType) {
+        case "tx_activate_validator.wasm":
+        case "tx_add_validator.wasm":
+        case "tx_become_validator.wasm":
+        case "tx_bond.wasm":
+        case "tx_change_validator_commission.wasm":
+        case "tx_change_validator_metadata.wasm":
+        case "tx_change_validator_power.wasm":
+        case "tx_deactivate_validator.wasm":
+        case "tx_reactivate_validator.wasm":
+        case "tx_remove_validator.wasm":
+        case "tx_unbond.wasm":
+        case "tx_unjail_validator.wasm": {
+          this.logEH(epoch, height, `Need to update validator`, txData.validator)
+          validatorsToUpdate.add(txData.validator)
+          break
         }
-        break
+        case "tx_init_proposal.wasm": {
+          const id = this.findProposalId(blockResults.endBlockEvents, tx.id)
+          if (id) {
+            this.logEH(epoch, height, `New proposal`, id)
+            proposalsToUpdate.add(id)
+          } else {
+            this.warnEH(epoch, height, `New proposal, unknown id`)
+          }
+          break
+        }
+        case "tx_vote_proposal.wasm": {
+          const { id, voter, vote } = txData
+          this.logEH(epoch, height, `Vote on`, id, 'by', voter, ':', vote)
+          proposalsToUpdate.add(id)
+          break
+        }
+      } else {
+        this.warnEH(epoch, height, "No supported TX content in", tx.id)
       }
-      case "tx_vote_proposal.wasm": {
-        const { id, voter, vote } = txData
-        this.logEH(epoch, height, `Vote on`, id, 'by', voter, ':', vote)
-        break
-      }
-    } else {
-      this.warnEH(epoch, height, "No supported TX content in", tx.id)
     }
+    return { validatorsToUpdate, proposalsToUpdate }
   }
 
-  /** Update all governance proposals.
-    * Called on every block. */
-  async updateGovernance (height, epoch) {
-    const proposals = await this.fetcher.chain.fetchProposalCount(epoch)
-    this.logEH(epoch, height, 'Proposals:', proposals)
-    const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
-    await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch, height) })
-  }
-
-  /** Update a single governance proposal.
-    * Called from updateGovernance. */
-  async updateProposal (id, epoch, height) {
-    const proposal = await DB.Proposal.findOne({ where: { id } })
-    if (proposal?.get().result) {
-      this.log.debug('Epoch', epoch, 'block', height, 'proposal', id, 'has result, skipping')
-      return
-    }
-    if (proposal === null) {
-      const proposalInfo = await this.fetcher.chain.fetchProposalInfo(id)
-      this.logEH(epoch, height, 'Adding proposal', id)
-      const { id: _, content, ...metadata } = proposalInfo
-      const fields = { id, content, metadata }
-      await DB.Proposal.upsert(fields)
-    }
-    this.logEH('Proposal', id, 'fetching result')
-    const result = await this.fetcher.chain.fetchProposalResult(id)
-    if (result) {
-      await DB.Proposal.upsert({ id, result })
-      this.logEH('Proposal', id, 'stored result')
-    }
-    const votes = await this.fetcher.chain.fetchProposalVotes(id)
-    this.logEH('Proposal', id, 'fetching power for', votes.length, 'votes')
-    await runParallel({ max: 30, inputs: votes, process: async vote => Object.assign(vote, {
-      power: vote.isValidator
-        ? await this.fetcher.chain.fetchValidatorStake(vote.validator, epoch)
-        : await this.fetcher.chain.fetchBondWithSlashing(vote.delegator, vote.validator, epoch)
-    }) })
-    this.logEH('Proposal', id, 'storing', votes.length, 'votes')
-    const transaction = undefined
-    //await DB.default.transaction(async transaction=>{
-      await DB.Vote.destroy({ where: { proposal: id } }, {transaction})
-      for (const vote of votes) {
-        await DB.Vote.upsert({ ...vote, proposal: id }, {transaction})
-      }
-    //})
-    this.logEH('Proposal', id, 'updated with', votes.length, 'votes')
-  }
-
-}
-
-/** Find proposal ID of newly created proposal in blockResults. */
-function findProposalId (endBlockEvents, txHash) {
-  for (const { type, attributes } of endBlockEvents) {
-    if (type === 'tx/applied') {
-      for (const { key, value } of attributes) {
-        if (key === 'hash' && value === txHash) {
-          for (const { key, value } of attributes) {
-            if (key === 'batch') {
-              const batch = JSON.parse(value)
-              const { Ok } = Object.values(batch)[0] || {}
-              if (Ok) {
-                const { events } = Ok
-                for (const event of events) {
-                  if (event.event_type?.inner === 'governance/proposal/new') {
-                    return event.attributes.proposal_id
+  /** Find proposal ID of newly created proposal in blockResults. */
+  findProposalId (endBlockEvents, txHash) {
+    for (const { type, attributes } of endBlockEvents) {
+      if (type === 'tx/applied') {
+        for (const { key, value } of attributes) {
+          if (key === 'hash' && value === txHash) {
+            for (const { key, value } of attributes) {
+              if (key === 'batch') {
+                const batch = JSON.parse(value)
+                const { Ok } = Object.values(batch)[0] || {}
+                if (Ok) {
+                  const { events } = Ok
+                  for (const event of events) {
+                    if (event.event_type?.inner === 'governance/proposal/new') {
+                      return event.attributes.proposal_id
+                    }
                   }
                 }
               }
@@ -269,6 +208,7 @@ function findProposalId (endBlockEvents, txHash) {
         }
       }
     }
+    return null
   }
-  return null
+
 }

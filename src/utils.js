@@ -127,13 +127,18 @@ export class Logged {
     this.log.log(`Epoch ${String(epoch)}:`, ...args)
   }
 
+  /** Log with height prefix. */
+  logH (height, ...args) {
+    this.log.log(`Block ${String(height)}:`, ...args)
+  }
+
   /** Log with epoch and height prefix. */
   logEH (epoch, height, ...args) {
-    this.log.log(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+    this.log.log(`Block ${String(height)}:`, `Epoch ${String(epoch)}:`, ...args)
   }
 
   /** Warn with epoch and height prefix. */
   warnEH (epoch, height, ...args) {
-    this.log.warn(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+    this.log.warn(`Block ${String(height)}:`, `Epoch ${String(epoch)}:`, ...args)
   }
 }

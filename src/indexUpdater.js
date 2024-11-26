@@ -129,42 +129,44 @@ export class Updater extends Logged {
     const validatorsToUpdate = new Set()
     const proposalsToUpdate  = new Set()
     for (const tx of block.transactions) {
-      const { type: txType, data: txData } = tx.data?.content || {}
-      if (txType) switch (txType) {
-        case "tx_activate_validator.wasm":
-        case "tx_add_validator.wasm":
-        case "tx_become_validator.wasm":
-        case "tx_bond.wasm":
-        case "tx_change_validator_commission.wasm":
-        case "tx_change_validator_metadata.wasm":
-        case "tx_change_validator_power.wasm":
-        case "tx_deactivate_validator.wasm":
-        case "tx_reactivate_validator.wasm":
-        case "tx_remove_validator.wasm":
-        case "tx_unbond.wasm":
-        case "tx_unjail_validator.wasm": {
-          this.logEH(epoch, height, `Need to update validator`, txData.validator)
-          validatorsToUpdate.add(txData.validator)
-          break
-        }
-        case "tx_init_proposal.wasm": {
-          const id = this.findProposalId(blockResults.endBlockEvents, tx.id)
-          if (id) {
-            this.logEH(epoch, height, `New proposal`, id)
-            proposalsToUpdate.add(id)
-          } else {
-            this.warnEH(epoch, height, `New proposal, unknown id`)
+      for (const content of tx.data?.content || []) {
+        const { type: txType, data: txData } = content || {}
+        if (txType) switch (txType) {
+          case "tx_activate_validator.wasm":
+          case "tx_add_validator.wasm":
+          case "tx_become_validator.wasm":
+          case "tx_bond.wasm":
+          case "tx_change_validator_commission.wasm":
+          case "tx_change_validator_metadata.wasm":
+          case "tx_change_validator_power.wasm":
+          case "tx_deactivate_validator.wasm":
+          case "tx_reactivate_validator.wasm":
+          case "tx_remove_validator.wasm":
+          case "tx_unbond.wasm":
+          case "tx_unjail_validator.wasm": {
+            this.logEH(epoch, height, `Need to update validator`, txData.validator)
+            validatorsToUpdate.add(txData.validator)
+            break
           }
-          break
+          case "tx_init_proposal.wasm": {
+            const id = this.findProposalId(blockResults.endBlockEvents, tx.id)
+            if (id) {
+              this.logEH(epoch, height, `New proposal`, id)
+              proposalsToUpdate.add(id)
+            } else {
+              this.warnEH(epoch, height, `New proposal, unknown id`)
+            }
+            break
+          }
+          case "tx_vote_proposal.wasm": {
+            const { id, voter, vote } = txData
+            this.logEH(epoch, height, `Vote on`, id, 'by', voter, ':', vote)
+            proposalsToUpdate.add(id)
+            break
+          }
+        } else {
+          this.warnEH(epoch, height, `Unupported content in TX ${tx.id}`, content)
         }
-        case "tx_vote_proposal.wasm": {
-          const { id, voter, vote } = txData
-          this.logEH(epoch, height, `Vote on`, id, 'by', voter, ':', vote)
-          proposalsToUpdate.add(id)
-          break
-        }
-      } else {
-        this.warnEH(epoch, height, "No supported TX content in", tx.id)
       }
     }
     return { validatorsToUpdate, proposalsToUpdate }

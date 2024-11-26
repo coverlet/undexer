@@ -116,3 +116,24 @@ export function addRoutes (router) {
   }
   return router
 }
+
+export class Logged {
+  constructor ({ log }) {
+    this.log = log
+  }
+
+  /** Log with epoch prefix. */
+  logE (epoch, ...args) {
+    this.log.log(`Epoch ${String(epoch)}:`, ...args)
+  }
+
+  /** Log with epoch and height prefix. */
+  logEH (epoch, height, ...args) {
+    this.log.log(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+  }
+
+  /** Warn with epoch and height prefix. */
+  warnEH (epoch, height, ...args) {
+    this.log.warn(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+  }
+}

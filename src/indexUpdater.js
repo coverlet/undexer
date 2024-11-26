@@ -1,26 +1,12 @@
 import { Fetcher } from './indexFetcher.js'
+import { Logged } from './utils.js'
 import * as DB from './db.js'
 
 /** Fetches data using the `Fetcher` and writes it into the `DB`. */
-export class Updater {
+export class Updater extends Logged {
   constructor (log, chain) {
-    this.log     = log
+    super({ log })
     this.fetcher = new Fetcher({ log, chain })
-  }
-
-  /** Log with epoch prefix. */
-  logE (epoch, ...args) {
-    this.log.log(`Epoch ${String(epoch)}:`, ...args)
-  }
-
-  /** Log with epoch and height prefix. */
-  logEH (epoch, height, ...args) {
-    this.log.log(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
-  }
-
-  /** Warn with epoch and height prefix. */
-  warnEH (epoch, height, ...args) {
-    this.log.warn(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
   }
 
   /** Update total stake at given epoch.

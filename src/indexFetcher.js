@@ -1,31 +1,36 @@
 import { Console } from '@fadroma/namada'
-import { retryForever, runParallel } from './utils.js'
+import { Logged, retryForever, runParallel } from './utils.js'
 
 const console = new Console('')
 
-export class Fetcher {
+export class Fetcher extends Logged {
   constructor ({ log, chain }) {
-    this.log   = log
+    super({ log })
     this.chain = chain
   }
 
   fetchTotalStake (epoch) {
+    this.logE(epoch, 'Fetching total stake')
     return retryForever(1000, () => this.chain.fetchTotalStaked({ epoch }))
   }
 
   fetchBlock (height) {
+    this.logE(epoch, 'Fetching block height')
     return retryForever(1000, () => this.chain.fetchBlock({ height, raw: true }))
   }
   
   fetchBlockResults (height) {
+    this.logEH(epoch, 'Fetching block results')
     return retryForever(1000, () => this.chain.fetchBlockResults({ height }))
   }
 
   fetchEpoch (height) {
+    this.logEH(epoch, height, 'Fetching epoch at height')
     return retryForever(1000, () => this.chain.fetchEpoch({ height }))
   }
 
   async fetchCurrentAndPastConsensusValidatorAddresses (epoch) {
+    this.logE(epoch, 'Fetching consensus validators')
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([
       this.chain.fetchValidatorsConsensus(epoch),
       (epoch > 0n) ? await this.chain.fetchValidatorsConsensus(epoch - 1n) : Promise.resolve([])
@@ -37,15 +42,18 @@ export class Fetcher {
   }
 
   async fetchRemainingValidatorAddresses (consAddrs, epoch) {
+    this.logE(epoch, 'Fetching non-consensus validators')
     const allAddrs = await this.chain.fetchValidatorAddresses(epoch)
     return allAddrs.filter(x=>!consAddrs.has(x))
   }
 
   async fetchValidatorAddresses (epoch) {
+    this.logE(epoch, 'Fetching validator addresses')
     return await this.chain.fetchValidatorAddresses(epoch)
   }
 
   async fetchValidators (inputs, epoch) {
+    this.logE(epoch, `Fetching ${inputs.length} validator(s)`)
     const iterator   = this.chain.fetchValidatorsIter({ epoch: Number(epoch), addresses: inputs })
     const process    = async _ => (await iterator.next()).value
     const validators = await runParallel({ max: 50, inputs, process })
@@ -54,32 +62,39 @@ export class Fetcher {
   }
 
   async fetchValidator (address, epoch) {
+    this.logE(epoch, `Fetching validators`, address)
     const validator = await this.chain.fetchValidator(address, { epoch })
     return Object.assign(validator, { epoch })
   }
 
   async fetchProposalCount (epoch) {
+    this.logE(epoch, `Fetching proposal count`)
     return await this.chain.fetchProposalCount(epoch)
   }
 
   async fetchProposals (ids, epoch) {
+    this.logE(epoch, `Fetching ${ids.length} proposal(s)`)
     throw new Error('todo')
   }
 
   async fetchProposalInfo (id, epoch) {
+    this.logE(epoch, `Fetching proposal info`, id)
     const { id: _, content, ...metadata } = await this.chain.fetchProposalInfo(id, epoch)
     return { id, content, metadata }
   }
 
   async fetchProposalResult (id, epoch) {
+    this.logE(epoch, `Fetching proposal result`, id)
     return await this.chain.fetchProposalResult(id, epoch)
   }
 
   async fetchProposalsVotes (ids, epoch) {
+    this.logE(epoch, `Fetching votes for ${ids.length} proposal(s)`)
     return await Promise.all(ids.map(id=>this.fetchProposalVotes(id, epoch)))
   }
 
   async fetchProposalVotes (id, epoch) {
+    this.logE(epoch, `Fetching proposal votes`, id)
     const votes = await this.chain.fetchProposalVotes(id)
     return await runParallel({
       max:     30,

@@ -13,26 +13,38 @@ export class Updater {
     this.fetcher = new Fetcher({ log, chain })
   }
 
+  logE (epoch, ...args) {
+    this.log.log(`Epoch ${String(epoch)}:`, ...args)
+  }
+
+  logEH (epoch, height, ...args) {
+    this.log.log(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+  }
+
+  warnEH (epoch, height, ...args) {
+    this.log.warn(`Epoch ${String(epoch)}: Block ${String(height)}:`, ...args)
+  }
+
   /** Update total stake at given epoch.
     * Called on every epoch. */
   async updateTotalStake (epoch) {
-    this.log("Updating total stake at epoch", epoch)
+    this.logE(epoch, "Updating total stake at epoch", epoch)
     const total = await this.fetcher.fetchTotalStake({ epoch })
-    this.log('Epoch', epoch, 'total stake:', total)
+    this.logE(epoch, 'Total stake:', total)
   }
 
   /** Update all validators at given epoch.
     * Called on every epoch. */
   async updateAllValidators (epoch) {
     const t0 = performance.now()
-    this.log("Updating validators at epoch", epoch)
+    this.logE(epoch, "Updating validators")
     const addresses  = await this.fetcher.chain.fetchValidatorAddresses(epoch)
-    this.log("Fetching", addresses.length,  "validator(s) at epoch", epoch)
+    this.logE(epoch, "Fetching", addresses.length,  "validator(s)")
     const validators = await this.fetcher.fetchValidators(addresses, epoch)
-    this.log("Storing",  validators.length, "validator(s) at epoch", epoch)
+    this.logE(epoch, "Storing",  validators.length, "validator(s)")
     await this.updateValidators(validators, epoch)
-    this.log("Updated",  validators.length, "validator(s) at epoch", epoch,
-             "in", ((performance.now()-t0)/1000).toFixed(3), 's')
+    const t1 = ((performance.now()-t0)/1000).toFixed(3)
+    this.logE(epoch, "Updated",  validators.length, "validator(s) in", t1, 's')
   }
 
   /** Update given validators at given epoch.
@@ -41,14 +53,13 @@ export class Updater {
     *   - After block containing validator-changing transactions
     *     (with changed validators). */
   async updateValidators (inputs, epoch) {
-    this.log("Updating", inputs.length, "validator(s)")
+    this.logE(epoch, "Updating", inputs.length, "validator(s)")
     await Promise.all(inputs.map(async validator => {
       validator = Object.assign(validator, { epoch, consensusAddress: validator.address })
-      console.log('Updating validator', validator.namadaAddress, 'at', epoch)
+      const { namadaAddress, state, stake } = validator
+      this.logE(epoch, 'Updating validator', namadaAddress)
       await DB.Validator.upsert(validator, { /*logging: console.log*/ })
-      console.log('Updated validator', validator.namadaAddress, 'at', epoch,
-        'state', validator.state,
-        'stake', validator.stake)
+      this.logE(epoch, 'Updated validator', namadaAddress, 'state', state, 'stake', stake)
     }))
   }
 
@@ -75,7 +86,8 @@ export class Updater {
       this.fetcher.fetchEpoch(height),
       this.fetcher.fetchBlockResults(height)
     ])
-    this.log.br().log(`Block ${height} (epoch ${epoch})`)
+    this.log.br()
+    this.logEH(epoch, height)
 
     // Things that need to be updated separately after the block. This is because
     // if we try to fetch them during the block update, the db transaction would time out.
@@ -104,8 +116,8 @@ export class Updater {
 
     // Populate stake for updated validators
     if (updatedValidators.size > 0) {
-      this.log.warn(
-        `!!! ${updatedValidators.size} validator(s) updated in this block.`+
+      this.warnEH(epoch, height,
+        `!!! ${updatedValidators.size} validator(s) updated in block.`+
         ` This will be reflected on next epoch.`
       )
       //const validators = await this.fetcher.fetchValidators([...updatedValidators], epoch)
@@ -117,15 +129,14 @@ export class Updater {
 
     // Log performed updates.
     const t = performance.now() - t0
-    this.log(`Block ${height} (epoch ${epoch}): added in`, t.toFixed(0), 'msec')
+    this.logEH(epoch, height, `Added in`, t.toFixed(0), 'msec')
   }
 
   /** Update a single transaction in the database.
     * Called from updateBlock for each transaction. */
   async updateTx (tx, options) {
     const { epoch, height, transaction, } = options
-    this.log(`Block ${height} (epoch ${epoch})`,
-             `TX ${tx.data?.content?.type}`, tx.id)
+    this.logEH(epoch, height, `TX ${tx.data?.content?.type}`, tx.id)
     await this.updateTxContent(tx, options)
     await DB.Transaction.upsert({
       chainId:     tx.data.chainId,
@@ -158,7 +169,7 @@ export class Updater {
       case "tx_remove_validator.wasm":
       case "tx_unbond.wasm":
       case "tx_unjail_validator.wasm": {
-        this.log(`Block ${height} (epoch ${epoch}): update to validator`, txData.validator)
+        this.logEH(epoch, height, `Need to update validator`, txData.validator)
         updatedValidators.add(txData.validator)
         break
       }
@@ -166,21 +177,22 @@ export class Updater {
         const { content, ...metadata } = txData || {}
         const id = findProposalId(blockResults.endBlockEvents, tx.id)
         if (id) {
-          this.log(`Block ${height} (epoch ${epoch}): New proposal`, id)
+          this.logEH(epoch, height, `New proposal`, id)
           const data = { id, content, metadata, initTx: tx.id }
           await DB.Proposal.upsert(data, {transaction})
         } else {
-          this.log.warn(`Block ${height} (epoch ${epoch}): New proposal, unknown id`)
+          this.warnEH(epoch, height, `New proposal, unknown id`)
           //await this.updateGovernance()
         }
         break
       }
       case "tx_vote_proposal.wasm": {
-        this.log(`Block ${height} (epoch ${epoch}) Vote on`, txData.id, 'by', txData.voter, ':', tx.data.content.data.vote)
+        const { id, voter, vote } = txData
+        this.logEH(epoch, height, `Vote on`, id, 'by', voter, ':', vote)
         break
       }
     } else {
-      console.warn("No supported TX content in", tx.id)
+      this.warnEH(epoch, height, "No supported TX content in", tx.id)
     }
   }
 
@@ -188,7 +200,7 @@ export class Updater {
     * Called on every block. */
   async updateGovernance (height, epoch) {
     const proposals = await this.fetcher.chain.fetchProposalCount(epoch)
-    this.log('Epoch', epoch, 'block', height, 'proposals:', proposals)
+    this.logEH(epoch, height, 'Proposals:', proposals)
     const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
     await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch, height) })
   }
@@ -203,25 +215,25 @@ export class Updater {
     }
     if (proposal === null) {
       const proposalInfo = await this.fetcher.chain.fetchProposalInfo(id)
-      this.log('Epoch', epoch, 'block', height, 'adding proposal', id)
+      this.logEH(epoch, height, 'Adding proposal', id)
       const { id: _, content, ...metadata } = proposalInfo
       const fields = { id, content, metadata }
       await DB.Proposal.upsert(fields)
     }
-    this.log('Epoch', epoch, 'block', height, 'proposal', id, 'fetching result')
+    this.logEH('Proposal', id, 'fetching result')
     const result = await this.fetcher.chain.fetchProposalResult(id)
     if (result) {
       await DB.Proposal.upsert({ id, result })
-      this.log('Epoch', epoch, 'block', height, 'proposal', id, 'stored result')
+      this.logEH('Proposal', id, 'stored result')
     }
     const votes = await this.fetcher.chain.fetchProposalVotes(id)
-    this.log('Epoch', epoch, 'block', height, 'proposal', id, 'fetching power for', votes.length, 'votes')
+    this.logEH('Proposal', id, 'fetching power for', votes.length, 'votes')
     await runParallel({ max: 30, inputs: votes, process: async vote => Object.assign(vote, {
       power: vote.isValidator
         ? await this.fetcher.chain.fetchValidatorStake(vote.validator, epoch)
         : await this.fetcher.chain.fetchBondWithSlashing(vote.delegator, vote.validator, epoch)
     }) })
-    this.log('Epoch', epoch, 'block', height, 'proposal', id, 'storing', votes.length, 'votes')
+    this.logEH('Proposal', id, 'storing', votes.length, 'votes')
     const transaction = undefined
     //await DB.default.transaction(async transaction=>{
       await DB.Vote.destroy({ where: { proposal: id } }, {transaction})
@@ -229,7 +241,7 @@ export class Updater {
         await DB.Vote.upsert({ ...vote, proposal: id }, {transaction})
       }
     //})
-    this.log('Epoch', epoch, 'block', height, 'proposal', id, 'updated with', votes.length, 'votes')
+    this.logEH('Proposal', id, 'updated with', votes.length, 'votes')
   }
 
 }

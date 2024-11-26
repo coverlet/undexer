@@ -304,7 +304,7 @@ export default class UndexerCommands extends Commands {
     if (data) {
       this.log.log('Proposal:', data)
       const result = await chain.fetchProposalResult(id)
-      this.log.log('Result:',   result)
+      this.log.log('Result:', result)
       if (data.proposal?.type?.type === 'DefaultWithWasm') {
         const wasm = await chain.fetchProposalWasm(id)
         if (wasm) {

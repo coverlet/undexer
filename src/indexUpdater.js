@@ -13,12 +13,16 @@ export class Updater {
     this.fetcher = new Fetcher({ log, chain })
   }
 
+  /** Update total stake at given epoch.
+    * Called on every epoch. */
   async updateTotalStake (epoch) {
     this.log("Updating total stake at epoch", epoch)
     const total = await this.fetcher.fetchTotalStake({ epoch })
     this.log('Epoch', epoch, 'total stake:', total)
   }
 
+  /** Update all validators at given epoch.
+    * Called on every epoch. */
   async updateAllValidators (epoch) {
     const t0 = performance.now()
     this.log("Updating validators at epoch", epoch)
@@ -31,6 +35,11 @@ export class Updater {
              "in", ((performance.now()-t0)/1000).toFixed(3), 's')
   }
 
+  /** Update given validators at given epoch.
+    * Called:
+    *   - On every epoch (with all validators).
+    *   - After block containing validator-changing transactions
+    *     (with changed validators). */
   async updateValidators (inputs, epoch) {
     this.log("Updating", inputs.length, "validator(s)")
     await Promise.all(inputs.map(async validator => {
@@ -43,12 +52,15 @@ export class Updater {
     }))
   }
 
+  /** Update a single validator by (consensus?) address.
+    * Currently unused. */
   async updateValidator (address, epoch) {
     const validator = await this.fetcher.chain.fetchValidator(address, { epoch })
     await DB.Validator.upsert(Object.assign(validator, { epoch }))
   }
 
-  /** Update a single block in the database. */
+  /** Update a single block in the database.
+    * Called on block increment. */
   async updateBlock ({ height, block }) {
     const t0 = performance.now()
 
@@ -100,7 +112,7 @@ export class Updater {
       //await this.updateValidators(validators, epoch)
     }
 
-    // Update proposals tha don't have stored results
+    // Update proposals that don't have stored results
     await this.updateGovernance(height, epoch)
 
     // Log performed updates.
@@ -108,7 +120,8 @@ export class Updater {
     this.log(`Block ${height} (epoch ${epoch}): added in`, t.toFixed(0), 'msec')
   }
 
-  /** Update a single transaction in the database. */
+  /** Update a single transaction in the database.
+    * Called from updateBlock for each transaction. */
   async updateTx (tx, options) {
     const { epoch, height, transaction, } = options
     this.log(`Block ${height} (epoch ${epoch})`,
@@ -127,6 +140,8 @@ export class Updater {
     }, { transaction })
   }
 
+  /** Update the inner content of a transaction.
+    * Called from updateTx. */
   async updateTxContent (tx, options) {
     const { epoch, height, blockResults, updatedValidators, transaction } = options
     const { type: txType, data: txData } = tx.data?.content || {}
@@ -169,6 +184,8 @@ export class Updater {
     }
   }
 
+  /** Update all governance proposals.
+    * Called on every block. */
   async updateGovernance (height, epoch) {
     const proposals = await this.fetcher.chain.fetchProposalCount(epoch)
     this.log('Epoch', epoch, 'block', height, 'proposals:', proposals)
@@ -176,6 +193,8 @@ export class Updater {
     await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch, height) })
   }
 
+  /** Update a single governance proposal.
+    * Called from updateGovernance. */
   async updateProposal (id, epoch, height) {
     const proposal = await DB.Proposal.findOne({ where: { id } })
     if (proposal?.get().result) {
@@ -215,6 +234,7 @@ export class Updater {
 
 }
 
+/** Find proposal ID of newly created proposal in blockResults. */
 function findProposalId (endBlockEvents, txHash) {
   for (const { type, attributes } of endBlockEvents) {
     if (type === 'tx/applied') {

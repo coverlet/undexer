@@ -55,7 +55,7 @@ export class Fetcher extends Logged {
   async fetchValidators (inputs, epoch) {
     if (inputs.length > 0) {
       this.logE(epoch, `Fetching ${inputs.length} validator(s)`)
-      const iterator   = this.chain.fetchValidatorsIter({ epoch: Number(epoch), addresses: inputs })
+      const iterator = this.chain.fetchValidatorsIter({ epoch: Number(epoch), addresses: inputs })
       return await runParallel({
         max: 50,
         inputs,
@@ -69,7 +69,7 @@ export class Fetcher extends Logged {
   async fetchValidator (address, epoch) {
     this.logE(epoch, `Fetching validators`, address)
     const validator = await this.chain.fetchValidator(address, { epoch })
-    return Object.assign(validator, { epoch })
+    return Object.assign(validator, { epoch, consensusAddress: address })
   }
 
   async fetchProposalCount (epoch) {

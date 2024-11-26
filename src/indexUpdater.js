@@ -107,15 +107,19 @@ export class Updater extends Logged {
       }
       // Update validators
       for (const validator of updatedValidators) {
-        await DB.Validator.upsert(validator, { transaction })
+        console.log('=======+>', {validator})
+        await DB.Validator.upsert(Object.assign(validator, {
+          epoch,
+          consensusAddress: validator.address
+        }), { transaction })
       }
       // Update proposals
       for (const proposal of updatedProposals) {
-        await DB.Proposal.upsert(proposal, { transaction })
+        await DB.Proposal.upsert(Object.assign(proposal, { epoch }), { transaction })
       }
       // Update votes
       for (const vote of updatedVotes) {
-        await DB.Vote.upsert(vote, transaction)
+        await DB.Vote.upsert(Object.assign(vote, { epoch }), transaction)
       }
     })
     // Log performed updates.
@@ -129,6 +133,7 @@ export class Updater extends Logged {
     const validatorsToUpdate = new Set()
     const proposalsToUpdate  = new Set()
     for (const tx of block.transactions) {
+      console.log('------>', tx.id, tx.data?.content)
       for (const content of tx.data?.content || []) {
         const { type: txType, data: txData } = content || {}
         if (txType) switch (txType) {
@@ -144,6 +149,7 @@ export class Updater extends Logged {
           case "tx_remove_validator.wasm":
           case "tx_unbond.wasm":
           case "tx_unjail_validator.wasm": {
+            console.log({content})
             this.logEH(epoch, height, `Need to update validator`, txData.validator)
             validatorsToUpdate.add(txData.validator)
             break

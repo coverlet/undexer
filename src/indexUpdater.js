@@ -13,7 +13,7 @@ export class Updater extends Logged {
     * Called on every epoch. */
   async updateTotalStake (epoch) {
     this.logE(epoch, "Updating total stake at epoch", epoch)
-    const total = await this.fetcher.fetchTotalStake({ epoch })
+    const total = await this.fetcher.fetchTotalStake(epoch)
     this.logE(epoch, 'Total stake:', total)
   }
 

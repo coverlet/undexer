@@ -107,7 +107,6 @@ export class Updater extends Logged {
       }
       // Update validators
       for (const validator of updatedValidators) {
-        console.log('=======+>', {validator})
         await DB.Validator.upsert(Object.assign(validator, {
           epoch,
           consensusAddress: validator.address
@@ -133,23 +132,23 @@ export class Updater extends Logged {
     const validatorsToUpdate = new Set()
     const proposalsToUpdate  = new Set()
     for (const tx of block.transactions) {
-      console.log('------>', tx.id, tx.data?.content)
       for (const content of tx.data?.content || []) {
         const { type: txType, data: txData } = content || {}
         if (txType) switch (txType) {
-          case "tx_activate_validator.wasm":
-          case "tx_add_validator.wasm":
           case "tx_become_validator.wasm":
+          case "tx_deactivate_validator.wasm":
+          case "tx_reactivate_validator.wasm":
+          case "tx_unjail_validator.wasm": {
+            this.logEH(epoch, height, `Need to update validator`, txData.address)
+            validatorsToUpdate.add(txData.address)
+            break
+          }
+          case "tx_activate_validator.wasm":
           case "tx_bond.wasm":
           case "tx_change_validator_commission.wasm":
           case "tx_change_validator_metadata.wasm":
           case "tx_change_validator_power.wasm":
-          case "tx_deactivate_validator.wasm":
-          case "tx_reactivate_validator.wasm":
-          case "tx_remove_validator.wasm":
-          case "tx_unbond.wasm":
-          case "tx_unjail_validator.wasm": {
-            console.log({content})
+          case "tx_unbond.wasm": {
             this.logEH(epoch, height, `Need to update validator`, txData.validator)
             validatorsToUpdate.add(txData.validator)
             break

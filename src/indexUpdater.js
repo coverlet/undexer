@@ -54,7 +54,6 @@ export class Updater extends Logged {
     height = block.height
     // Fetch epoch number
     const epoch = await this.fetcher.fetchEpoch(height)
-    this.log.br()
     this.logEH(epoch, height)
     // Fetch block results
     const blockResults = await this.fetcher.fetchBlockResults(height)

@@ -38,7 +38,7 @@ export class Indexer extends Logged {
     await this.remote.connect()
     // Query latest indexed block and epoch from DB
     this.blockInDatabase = BigInt(await Query.latestBlock()||0)
-    this.epochInDatabase = BigInt(await Query.latestEpoch()||-1)
+    this.epochInDatabase = BigInt(await Query.latestEpoch()??-1)
     this.logEH(this.epochInDatabase, this.blockInDatabase, 'Starting')
     return runForever(1000, () => this.update())
   }
@@ -60,7 +60,7 @@ export class Indexer extends Logged {
     // Update epoch counter.
     this.log.br()
     this.epochOnChain    = BigInt(await this.fetcher.fetchEpoch(this.blockOnChain))
-    this.epochInDatabase = BigInt(await Query.latestEpoch()||-1)
+    this.epochInDatabase = BigInt(await Query.latestEpoch()??-1)
     this.log(
       `Epoch`, String(this.epochInDatabase), `/`, String(this.epochOnChain),
       `(${String(this.epochOnChain - this.epochInDatabase)} behind)`

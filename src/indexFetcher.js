@@ -74,8 +74,8 @@ export class Fetcher extends Logged {
   }
 
   async fetchAllValidators (epoch) {
-    const addresses = await this.fetcher.fetchValidatorAddresses(epoch)
-    return await this.fetcher.fetchValidators(addresses, epoch)
+    const addresses = await this.fetchValidatorAddresses(epoch)
+    return await this.fetchValidators(addresses, epoch)
   }
 
   async fetchValidators (inputs, epoch) {

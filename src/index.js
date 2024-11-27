@@ -94,7 +94,7 @@ export class Indexer extends Logged {
     } else if (this.epochInDatabase < this.epochOnChain) {
       // If we are 1 or 2 epochs behind, we can update the data
       // for the given epoch, thus advancing the epoch counter.
-      await this.updater.updateEpoch({ epoch, height })
+      await this.updater.updateEpoch({ epoch: this.epochInDatabase + 1n, height })
     } else if (await this.remote.isPaused()) {
       // If we are not behind on the epochs, but the sync is paused,
       // this means we are ready to resume the sync.

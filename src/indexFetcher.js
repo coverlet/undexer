@@ -128,7 +128,7 @@ export class Fetcher extends Logged {
         ids.push(id)
       }
     }
-    return await fetchProposalsWithVotes(ids)
+    return await this.fetchProposalsWithVotes(ids)
   }
 
   async fetchProposalsWithVotes (ids, epoch) {

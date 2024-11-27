@@ -16,6 +16,9 @@ export const totalBlocks = () =>
   DB.Block.count()
 
 export const latestEpoch = () =>
+  DB.Epoch.max('id')
+
+export const latestEpochFromBlock = () =>
   DB.Block.max('epoch')
 
 export const latestEpochForValidators = async (epoch) => {

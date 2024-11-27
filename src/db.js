@@ -7,7 +7,7 @@ import { CHAIN_ID, DATABASE_URL } from "./config.js"
 export { Sequelize, DataTypes, Op }
 
 const console = new Console("DB");
-const { DATE, TEXT, BLOB, JSONB, INTEGER, BOOLEAN } = DataTypes
+const { DATE, TEXT, BLOB, JSONB, INTEGER, BOOLEAN, BIGINT } = DataTypes
 
 const db = new Sequelize(DATABASE_URL, {
   dialect: "postgres",
@@ -145,7 +145,7 @@ export const
 
   Epoch = db.define('epoch', {
     id:         IntegerPrimaryKey(true),
-    totalStake: { type: INTEGER },
+    totalStake: { type: BIGINT },
     parameters: JSONField('parameters')
   }),
 

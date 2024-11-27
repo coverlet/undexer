@@ -34,6 +34,22 @@ export class Fetcher extends Logged {
     return retryForever(1000, () => this.chain.fetchTotalStaked({ epoch }))
   }
 
+  async fetchAllParameters (epoch) {
+    this.logE(epoch, 'Fetching all chain parameters')
+    const [protocol, pgf, pos, gov] = await Promise.all([
+      retryForever(1000, () => this.chain.fetchProtocolParameters()),
+      retryForever(1000, () => this.chain.fetchPGFParameters()),
+      retryForever(1000, () => this.chain.fetchStakingParameters()),
+      retryForever(1000, () => this.chain.fetchGovernanceParameters())
+    ])
+    return {
+      protocol,
+      pgf,
+      pos,
+      gov
+    }
+  }
+
   async fetchCurrentAndPastConsensusValidatorAddresses (epoch) {
     this.logE(epoch, 'Fetching consensus validators')
     const [currentConsensusValidators, previousConsensusValidators] = await Promise.all([

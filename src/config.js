@@ -14,8 +14,6 @@ export const PROXY_CONTROL_URL  = process.env.PROXY_CONTROL_URL || 'http://sync-
 export const RPC_URL            = process.env.RPC_URL           || 'http://rpc-proxy:26657'
 /// Don't reset the indexing node from scratch if more than 2 epochs out of sync
 export const ALLOW_INCOMPLETE   = Boolean(process.env.ALLOW_INCOMPLETE) || false
-/// Start indexing from this block
-export const START_BLOCK        = BigInt(process.env.START_BLOCK || 1)
 /// Force truncate the database on start (`db.sync({ force: true })`)
 export const START_FROM_SCRATCH = process.env.START_FROM_SCRATCH || false
 
@@ -51,7 +49,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     PROXY_CONTROL_URL,
     RPC_URL,
     ALLOW_INCOMPLETE,
-    START_BLOCK,
     START_FROM_SCRATCH,
   })
 }

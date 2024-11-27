@@ -37,7 +37,7 @@ export class Indexer extends Logged {
     // Connect to remote control sockets (for pausing/unpausing/resyncing node)
     await this.remote.connect()
     // Query latest indexed block and epoch from DB
-    this.blockInDatabase = await maxBigInt(Config.START_BLOCK, BigInt(await Query.latestBlock()||0))
+    this.blockInDatabase = BigInt(await Query.latestBlock()||0)
     this.epochInDatabase = BigInt(await Query.latestEpochForValidators()||0)
     this.logEH(this.epochInDatabase, this.blockInDatabase, 'Starting')
     return runForever(1000, () => this.update())
@@ -46,7 +46,7 @@ export class Indexer extends Logged {
   async update () {
     // Update block counter.
     this.blockOnChain    = BigInt(await this.fetcher.fetchHeight())
-    this.blockInDatabase = maxBigInt(Config.START_BLOCK, BigInt(await Query.latestBlock()||0))
+    this.blockInDatabase = BigInt(await Query.latestBlock()||0)
     this.log(
       `Block`, this.blockInDatabase, `/`, this.blockOnChain, 
       `(${(this.blockOnChain - this.blockInDatabase)} behind)`
@@ -85,7 +85,10 @@ export class Indexer extends Logged {
         )
         await this.remote.restart()
       }
+    } else if (this.epochInDatabase < this.epochOnChain) {
+      await this.updater.updateEpoch({ epoch, height })
     }
+
     // FIXME: Not call this too early
     if (await this.remote.isPaused()) {
       console.log('🟢 Resuming sync')

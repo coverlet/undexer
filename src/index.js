@@ -49,8 +49,8 @@ export class Indexer extends Logged {
     this.blockOnChain    = BigInt(await this.fetcher.fetchHeight())
     this.blockInDatabase = BigInt(await Query.latestBlock()||0)
     this.log(
-      `Block`, this.blockInDatabase, `/`, this.blockOnChain, 
-      `(${(this.blockOnChain - this.blockInDatabase)} behind)`
+      `Block`, String(this.blockInDatabase), `/`, String(this.blockOnChain),
+      `(${String(this.blockOnChain - this.blockInDatabase)} behind)`
     )
     // Update block data, transactions, validators, proposals, votes.
     if (this.blockInDatabase < this.blockOnChain) {
@@ -62,8 +62,8 @@ export class Indexer extends Logged {
     this.epochOnChain    = BigInt(await this.fetcher.fetchEpoch(this.blockOnChain))
     this.epochInDatabase = BigInt(await Query.latestEpoch()||0)
     this.log(
-      `Epoch`, this.epochInDatabase, `/`, this.epochOnChain,
-      `(${(this.epochOnChain - this.epochInDatabase)} behind)`
+      `Epoch`, String(this.epochInDatabase), `/`, String(this.epochOnChain),
+      `(${String(this.epochOnChain - this.epochInDatabase)} behind)`
     )
     // Update epoch data, resume, or resync:
     if (this.epochInDatabase < this.epochOnChain - 2n) {
@@ -94,7 +94,7 @@ export class Indexer extends Logged {
     } else if (this.epochInDatabase < this.epochOnChain) {
       // If we are 1 or 2 epochs behind, we can update the data
       // for the given epoch, thus advancing the epoch counter.
-      await this.updater.updateEpoch({ epoch: this.epochInDatabase + 1n, height })
+      await this.updater.updateEpoch({ epoch: this.epochInDatabase + 1n })
     } else if (await this.remote.isPaused()) {
       // If we are not behind on the epochs, but the sync is paused,
       // this means we are ready to resume the sync.

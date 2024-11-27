@@ -1,12 +1,11 @@
-import { Fetcher } from './indexFetcher.js'
 import { Logged } from './utils.js'
 import * as DB from './db.js'
 
 /** Fetches data using the `Fetcher` and writes it into the `DB`. */
 export class Updater extends Logged {
-  constructor (log, chain) {
+  constructor ({ log, fetcher }) {
     super({ log })
-    this.fetcher = new Fetcher({ log, chain })
+    this.fetcher = fetcher
   }
 
   /** Update total stake at given epoch.
@@ -15,6 +14,7 @@ export class Updater extends Logged {
     this.logE(epoch, "Updating total stake at epoch", epoch)
     const total = await this.fetcher.fetchTotalStake(epoch)
     this.logE(epoch, 'Total stake:', total)
+    return total
   }
 
   /** Update all validators at given epoch.

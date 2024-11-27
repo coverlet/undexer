@@ -9,11 +9,11 @@ export class Fetcher extends Logged {
     this.chain = chain
   }
 
-  fetchTotalStake (epoch) {
-    this.logE(epoch, 'Fetching total stake')
-    return retryForever(1000, () => this.chain.fetchTotalStaked({ epoch }))
+  fetchHeight () {
+    this.log('Fetching block height')
+    return retryForever(1000, () => this.chain.fetchHeight())
   }
-
+  
   fetchBlock (height) {
     this.logH(height, 'Fetching block')
     return retryForever(1000, () => this.chain.fetchBlock({ height, raw: true }))
@@ -27,6 +27,11 @@ export class Fetcher extends Logged {
   fetchEpoch (height) {
     this.logH(height, 'Fetching epoch at height')
     return retryForever(1000, () => this.chain.fetchEpoch({ height }))
+  }
+
+  fetchTotalStake (epoch) {
+    this.logE(epoch, 'Fetching total stake')
+    return retryForever(1000, () => this.chain.fetchTotalStaked({ epoch }))
   }
 
   async fetchCurrentAndPastConsensusValidatorAddresses (epoch) {

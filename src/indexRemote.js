@@ -1,15 +1,19 @@
 //deno-lint-ignore-file no-async-promise-executor
 import { Console } from '@fadroma/namada'
-import { NODE_CONTROL_URL, PROXY_CONTROL_URL } from './config.js'
+import * as Config from './config.js'
+import { Logged } from './utils.js'
 const console = new Console('')
 
 /** Remote control for node and node-out proxy. */
-export class RemoteControl {
+export class RemoteControl extends Logged {
   constructor ({
     chain,
-    proxyApi = PROXY_CONTROL_URL,
-    nodeApi  = NODE_CONTROL_URL,
+    proxyApi = Config.PROXY_CONTROL_URL,
+    nodeApi  = Config.NODE_CONTROL_URL,
+    log      = console
   } = {}) {
+    super({ log })
+
     this.proxyApi = proxyApi
     const proxyWs = Object.assign(new URL(proxyApi), { protocol: 'ws:' }).href
     this.proxyWs  = new ReconnectingWebSocket(proxyWs)
@@ -19,25 +23,32 @@ export class RemoteControl {
     this.nodeWs  = new ReconnectingWebSocket(nodeWs)
 
     this.chain = chain
+
+    // Mute debug logging from Fadroma.
     this.chain.log.debug = () => {}
     this.chain.connections[0].log.debug = () => {}
+  }
+
+  async connect () {
+    await Promise.all([this.proxyWs.connect(), this.nodeWs.connect(),])
+    this.log('Connected to remote control sockets.')
   }
 
   async isPaused () {
     const response = await fetch(this.proxyApi)
     const json = await response.json()
-    console.log('isPaused response:', json)
+    this.log('isPaused response:', json)
     const status = json.canConnect
     return !status
   }
 
   async resume () {
-    console.log('🟢 Sending resume sync command', this.proxyApi)
+    this.log('🟢 Sending resume sync command', this.proxyApi)
     ;(await this.proxyWs.socket).send(JSON.stringify({resume:{}}))
   }
 
   async restart () {
-    console.log('🟠 Sending restart sync to', this.nodeApi)
+    this.log('🟠 Sending restart sync to', this.nodeApi)
     ;(await this.nodeWs.socket).send(JSON.stringify({restart:{}}))
     await this.resume()
   }

@@ -8,18 +8,18 @@ export class Updater extends Logged {
     this.fetcher = fetcher
   }
 
-  async updateEpoch ({ epoch, height }) {
+  async updateEpoch ({ epoch }) {
     // Fetch total stake
-    this.logEH(epoch, height, 'Updating total stake')
+    this.logE(epoch, 'Updating total stake')
     const totalStake = await this.fetcher.fetchTotalStake(epoch)
     // Fetch parameters
-    this.logEH(epoch, height, 'Updating chain parameters')
+    this.logE(epoch, 'Updating chain parameters')
     const parameters = await this.fetcher.fetchAllParameters(epoch)
     // Fetch validators
-    this.logEH(epoch, height, 'Updating all validators')
+    this.logE(epoch, 'Updating all validators')
     const validators = await this.fetcher.fetchAllValidators(epoch)
     // Fetch proposals and votes
-    this.logEH(epoch, height, 'Updating all active proposals')
+    this.logE(epoch, 'Updating all active proposals')
     const proposals = await this.fetcher.fetchAllActiveProposalsWithVotes(epoch)
     // Store epoched data
     await DB.default.transaction(async transaction => {

@@ -40,7 +40,7 @@ export class Indexer extends Logged {
     this.blockInDatabase = BigInt(await Query.latestBlock()||0)
     this.epochInDatabase = BigInt(await Query.latestEpoch()??-1)
     this.logEH(this.epochInDatabase, this.blockInDatabase, 'Starting')
-    return runForever(1000, () => this.update())
+    return runForever(Config.TICK, () => this.update())
   }
 
   async update () {

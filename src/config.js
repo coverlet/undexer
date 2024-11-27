@@ -12,10 +12,12 @@ export const DATABASE_URL       = process.env.DATABASE_URL      || `postgres://$
 export const NODE_CONTROL_URL   = process.env.NODE_CONTROL_URL  || 'http://node:25551'
 export const PROXY_CONTROL_URL  = process.env.PROXY_CONTROL_URL || 'http://sync-proxy:25552'
 export const RPC_URL            = process.env.RPC_URL           || 'http://rpc-proxy:26657'
-/// Don't reset the indexing node from scratch if more than 2 epochs out of sync
+/** Don't reset the indexing node from scratch if more than 2 epochs out of sync */
 export const ALLOW_INCOMPLETE   = Boolean(process.env.ALLOW_INCOMPLETE) || false
-/// Force truncate the database on start (`db.sync({ force: true })`)
+/** Force truncate the database on start (`db.sync({ force: true })`) */
 export const START_FROM_SCRATCH = process.env.START_FROM_SCRATCH || false
+/** Interval per which the indexer checks for new block and epoch. */
+export const TICK = Number(process.env.TICK) || 500
 
 export const GOVERNANCE_TRANSACTIONS = [
   "tx_vote_proposal.wasm",

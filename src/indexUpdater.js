@@ -72,6 +72,9 @@ export class Updater extends Logged {
       this.fetcher.fetchProposals([...proposalsToUpdate], epoch),
       this.fetcher.fetchProposalsVotes([...proposalsToUpdate], epoch),
     ])
+    console.log({ updatedValidators })
+    console.log({ updatedProposals })
+    console.log({ updatedVotes })
     // TODO: check for governance proposals that were not caught by the above logic
     // Update the block and the contained transaction.
     await DB.default.transaction(async transaction => {

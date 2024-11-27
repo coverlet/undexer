@@ -85,10 +85,16 @@ export class Fetcher extends Logged {
   async fetchProposals (ids, epoch) {
     if (ids.length > 0) {
       this.logE(epoch, `Fetching ${ids.length} proposal(s)`)
-      throw new Error('todo')
+      return await Promise.all(ids.map(id=>this.fetchProposal(id, epoch)))
     } else {
       return []
     }
+  }
+
+  async fetchProposal (id, epoch) {
+    const { id: _, content, ...metadata } = await this.chain.fetchProposalInfo(id, { epoch })
+    const result = await this.chain.fetchProposalResult(id)
+    return { id, content, metadata, result }
   }
 
   async fetchProposalInfo (id, epoch) {
@@ -124,28 +130,21 @@ export class Fetcher extends Logged {
         const power = isValidator
           ? await this.chain.fetchValidatorStake(vote.validator, epoch)
           : await this.chain.fetchBondWithSlashing(vote.delegator, vote.validator, epoch)
-        console.log(`Epoch ${epoch} proposal ${id} vote by ${kind} ${voter}: ${power}`)
+        //this.logE(epoch, `Proposal ${id}: vote ${vote.data} by ${kind} ${voter}: ${power}`)
         return {
           proposal: id,
-          voter,
+          kind,
           isValidator,
           validator: vote.validator,
           delegator: vote.delegator,
-          power
+          voter,
+          power,
+          data: vote.data,
         }
       }
     })
   }
 }
-
-  /** Update all governance proposals.
-    * Called on every block. */
-  //async updateGovernance (height, epoch) {
-    //const proposals = await this.fetcher.chain.fetchProposalCount(epoch)
-    //this.logEH(epoch, height, 'Proposals:', proposals)
-    //const inputs = Array(Number(proposals)).fill(-1).map((_,i)=>i).reverse()
-    //await runParallel({ max: 30, inputs, process: id => this.updateProposal(id, epoch, height) })
-  //}
 
   /** Update a single governance proposal.
     * Called from updateGovernance. */

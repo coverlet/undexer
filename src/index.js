@@ -62,7 +62,7 @@ export class Indexer extends Logged {
     // TODO: reindex all proposals/votes once per epoch?
 
     // Update epoch counter.
-    this.epochOnChain    = BigInt(await this.fetcher.fetchEpoch(blockOnChain))
+    this.epochOnChain    = BigInt(await this.fetcher.fetchEpoch(this.blockOnChain))
     this.epochInDatabase = BigInt(await Query.latestEpochForValidators()||0)
     this.log(
       `Epoch`, this.epochInDatabase, `/`, this.epochOnChain,

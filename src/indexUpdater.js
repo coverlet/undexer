@@ -67,14 +67,10 @@ export class Updater extends Logged {
       epoch, height, block, blockResults
     )
     // Fetch data for validators and proposals that were updated during the block.
-    const [updatedValidators, updatedProposals, updatedVotes] = await Promise.all([
+    const [updatedValidators, updatedProposals] = await Promise.all([
       this.fetcher.fetchValidators([...validatorsToUpdate], epoch),
-      this.fetcher.fetchProposals([...proposalsToUpdate], epoch),
-      this.fetcher.fetchProposalsVotes([...proposalsToUpdate], epoch),
+      this.fetcher.fetchProposalsWithVotes([...proposalsToUpdate], epoch),
     ])
-    console.log({ updatedValidators })
-    console.log({ updatedProposals })
-    console.log({ updatedVotes })
     // TODO: check for governance proposals that were not caught by the above logic
     // Update the block and the contained transaction.
     await DB.default.transaction(async transaction => {
@@ -95,7 +91,7 @@ export class Updater extends Logged {
       // Update each transaction in block
       for (const tx of block.transactions) {
         // Update transaction data
-        this.logEH(epoch, height, `TX ${tx.data?.content?.type}`, tx.id)
+        this.logEH(epoch, height, `TX ${tx.id}: ${tx.data?.content[0]?.type}`)
         await DB.Transaction.upsert({
           chainId:     tx.data.chainId,
           blockHash:   tx.block.hash,
@@ -103,25 +99,22 @@ export class Updater extends Logged {
           blockHeight: tx.block.height,
           txHash:      tx.id,
           txTime:      tx.data.timestamp,
-          txType:      tx.data.content.type,
-          txContent:   tx.data.content.data,
+          txType:      tx.data.content[0].type,
+          txContent:   tx.data.content[0].data,
           txData:      tx, // TODO deprecate
         }, { transaction })
       }
-      // Update validators
+      // Store updated validators
       for (const validator of updatedValidators) {
-        await DB.Validator.upsert(Object.assign(validator, {
-          epoch,
-          consensusAddress: validator.address
-        }), { transaction })
+        await DB.Validator.upsert(validator, { transaction })
       }
-      // Update proposals
-      for (const proposal of updatedProposals) {
-        await DB.Proposal.upsert(Object.assign(proposal, { epoch }), { transaction })
-      }
-      // Update votes
-      for (const vote of updatedVotes) {
-        await DB.Vote.upsert(Object.assign(vote, { epoch }), transaction)
+      // Store updated proposals
+      for (const { votes, ...proposal } of updatedProposals) {
+        await DB.Proposal.upsert(proposal, { transaction })
+        // Store updated votes for each proposal
+        for (const vote of votes) {
+          await DB.Vote.upsert(Object.assign(vote, { epoch }), transaction)
+        }
       }
     })
     // Log performed updates.

@@ -64,7 +64,12 @@ export class Fetcher extends Logged {
       return await runParallel({
         max: 50,
         inputs,
-        process: async _ => (await iterator.next()).value
+        process: async _ => {
+          const validator = (await iterator.next()).value
+          validator.epoch = epoch
+          validator.consensusAddress = validator.address
+          return validator
+        }
       })
     } else {
       return []
@@ -91,10 +96,23 @@ export class Fetcher extends Logged {
     }
   }
 
+  async fetchProposalsWithVotes (ids, epoch) {
+    if (ids.length > 0) {
+      this.logE(epoch, `Fetching ${ids.length} proposal(s)`)
+      return await Promise.all(ids.map(async id=>{
+        const proposal = await this.fetchProposal(id, epoch)
+        proposal.votes = await this.fetchProposalVotes(id, epoch)
+        return proposal
+      }))
+    } else {
+      return []
+    }
+  }
+
   async fetchProposal (id, epoch) {
     const { id: _, content, ...metadata } = await this.chain.fetchProposalInfo(id, { epoch })
     const result = await this.chain.fetchProposalResult(id)
-    return { id, content, metadata, result }
+    return { id, epoch, content, metadata, result }
   }
 
   async fetchProposalInfo (id, epoch) {
@@ -140,6 +158,7 @@ export class Fetcher extends Logged {
           voter,
           power,
           data: vote.data,
+          epoch,
         }
       }
     })

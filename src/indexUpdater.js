@@ -8,43 +8,40 @@ export class Updater extends Logged {
     this.fetcher = fetcher
   }
 
-  /** Update total stake at given epoch.
-    * Called on every epoch. */
-  async updateTotalStake (epoch) {
-    this.logE(epoch, "Updating total stake at epoch", epoch)
-    const total = await this.fetcher.fetchTotalStake(epoch)
-    this.logE(epoch, 'Total stake:', total)
-    return total
-  }
-
-  /** Update all validators at given epoch.
-    * Called on every epoch. */
-  async updateAllValidators (epoch) {
-    const t0 = performance.now()
-    this.logE(epoch, "Updating validators")
-    const addresses  = await this.fetcher.fetchValidatorAddresses(epoch)
-    this.logE(epoch, "Fetching", addresses.length,  "validator(s)")
-    const validators = await this.fetcher.fetchValidators(addresses, epoch)
-    this.logE(epoch, "Storing",  validators.length, "validator(s)")
-    await this.updateValidators(validators, epoch)
-    const t1 = ((performance.now()-t0)/1000).toFixed(3)
-    this.logE(epoch, "Updated",  validators.length, "validator(s) in", t1, 's')
-  }
-
-  /** Update given validators at given epoch.
-    * Called:
-    *   - On every epoch (with all validators).
-    *   - After block containing validator-changing transactions
-    *     (with changed validators). */
-  async updateValidators (inputs, epoch) {
-    this.logE(epoch, "Updating", inputs.length, "validator(s)")
-    await Promise.all(inputs.map(async validator => {
-      validator = Object.assign(validator, { epoch, consensusAddress: validator.address })
-      const { namadaAddress, state, stake } = validator
-      this.logE(epoch, 'Updating validator', namadaAddress)
-      await DB.Validator.upsert(validator, { /*logging: console.log*/ })
-      this.logE(epoch, `Updated validator ${namadaAddress} (${state.state}) ${stake}`)
-    }))
+  async updateEpoch ({ epoch, height }) {
+    // Fetch total stake
+    this.logEH(epoch, height, 'Updating total stake')
+    const totalStake = await this.fetcher.fetchTotalStake(epoch)
+    // Fetch parameters
+    this.logEH(epoch, height, 'Updating chain parameters')
+    const parameters = await this.fetcher.fetchAllParameters(epoch)
+    // Fetch validators
+    this.logEH(epoch, height, 'Updating all validators')
+    const validators = await this.fetcher.fetchAllValidators(epoch)
+    // Fetch proposals and votes
+    this.logEH(epoch, height, 'Updating all active proposals')
+    const proposals = await this.fetcher.fetchAllActiveProposalsWithVotes(epoch)
+    // Store epoched data
+    await DB.default.transaction(async transaction => {
+      // Store epoch with total stake and parameters
+      await DB.Epoch.upsert({ id: epoch, totalStake, parameters }, { transaction })
+      // Store validator states
+      for (const validator of validators) {
+        validator.epoch = epoch
+        validator.consensusAddress = validator.address
+        const { namadaAddress, state, stake } = validator
+        this.logE(epoch, `Updating validator ${namadaAddress} (${state.state}) ${stake}`)
+        await DB.Validator.upsert(validator, { transaction })
+      }
+      // Store proposals and votes
+      for (const { votes, ...proposal } of proposals) {
+        await DB.Proposal.upsert(proposal, { transaction })
+        // Store updated votes for each proposal
+        for (const vote of votes) {
+          await DB.Vote.upsert(Object.assign(vote, { epoch }), transaction)
+        }
+      }
+    })
   }
 
   /** Update a single block in the database.

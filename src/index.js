@@ -72,7 +72,7 @@ export class Indexer extends Logged {
     // correct values for certain fields become impossible to fetch.
     // So we have to trigger a full resync of the local node.
     if (this.epochInDatabase < this.epochOnChain - 2n) {
-      if (ALLOW_INCOMPLETE) {
+      if (Config.ALLOW_INCOMPLETE) {
         console.warn(
           `DB is >2 epochs behind chain (DB ${this.inDB}, `+
           `chain ${this.onChain}). Historical data may be inaccurate! `+

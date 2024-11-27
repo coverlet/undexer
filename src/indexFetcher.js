@@ -57,6 +57,11 @@ export class Fetcher extends Logged {
     return await this.chain.fetchValidatorAddresses(epoch)
   }
 
+  async fetchAllValidators (epoch) {
+    const addresses = await this.fetcher.fetchValidatorAddresses(epoch)
+    return await this.fetcher.fetchValidators(addresses, epoch)
+  }
+
   async fetchValidators (inputs, epoch) {
     if (inputs.length > 0) {
       this.logE(epoch, `Fetching ${inputs.length} validator(s)`)
@@ -94,6 +99,20 @@ export class Fetcher extends Logged {
     } else {
       return []
     }
+  }
+
+  async fetchAllActiveProposalsWithVotes (epoch) {
+    const count = await this.fetchProposalCount(epoch)
+    const ids = []
+    for (let id = 0; id < count; id++) {
+      const result = await this.fetchProposalResult(id, epoch)
+      if (result) {
+        this.logE(epoch, 'Proposal', id, 'has stored result, not updating')
+      } else {
+        ids.push(id)
+      }
+    }
+    return await fetchProposalsWithVotes(ids)
   }
 
   async fetchProposalsWithVotes (ids, epoch) {

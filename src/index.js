@@ -57,11 +57,6 @@ export class Indexer extends Logged {
       const height = this.blockInDatabase + 1n
       await retryForever(1000, () => this.updater.updateBlock({ height }))
     }
-
-    // TODO: update total stake in block or epoch?
-    // TODO: reindex all validators once per epoch?
-    // TODO: reindex all proposals/votes once per epoch?
-
     // Update epoch counter.
     this.log.br()
     this.epochOnChain    = BigInt(await this.fetcher.fetchEpoch(this.blockOnChain))
@@ -70,10 +65,19 @@ export class Indexer extends Logged {
       `Epoch`, this.epochInDatabase, `/`, this.epochOnChain,
       `(${(this.epochOnChain - this.epochInDatabase)} behind)`
     )
-    // If we are more than 2 epochs behind the chain,
-    // correct values for certain fields become impossible to fetch.
-    // So we have to trigger a full resync of the local node.
+    // Update epoch data, resume, or resync:
     if (this.epochInDatabase < this.epochOnChain - 2n) {
+      // If we are more than 2 epochs behind the chain, it becomes
+      // impossible to fetch correct values for certain fields (pruned).
+      // So... we need to trigger a full resync of the local node.
+      //
+      // Normally, this should not happen, as the node controller
+      // automatically tells the sync proxy controller to cut off
+      // the connection on epoch increment, thus pausing the sync
+      // on each epoch for the indexer to catch up.
+      //
+      // Thus, if this code is reached, it signals a bug in the
+      // sync pauser, or else another invalid condition.
       if (Config.ALLOW_INCOMPLETE) {
         console.warn(
           `DB is >2 epochs behind chain (DB ${this.inDB}, `+
@@ -88,11 +92,12 @@ export class Indexer extends Logged {
         await this.remote.restart()
       }
     } else if (this.epochInDatabase < this.epochOnChain) {
+      // If we are 1 or 2 epochs behind, we can update the data
+      // for the given epoch, thus advancing the epoch counter.
       await this.updater.updateEpoch({ epoch, height })
-    }
-
-    // FIXME: Not call this too early
-    if (await this.remote.isPaused()) {
+    } else if (await this.remote.isPaused()) {
+      // If we are not behind on the epochs, but the sync is paused,
+      // this means we are ready to resume the sync.
       console.log('🟢 Resuming sync')
       await this.remote.resume()
     }

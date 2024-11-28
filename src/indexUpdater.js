@@ -95,9 +95,7 @@ export class Updater extends Logged {
           blockHeight: tx.block.height,
           txHash:      tx.id,
           txTime:      tx.data.timestamp,
-          txType:      tx.data.content[0].type,
-          txContent:   tx.data.content[0].data,
-          txData:      tx, // TODO deprecate
+          txData:      tx
         }, { transaction })
       }
       // Store updated validators

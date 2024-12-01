@@ -17,7 +17,7 @@ export const ALLOW_INCOMPLETE   = Boolean(process.env.ALLOW_INCOMPLETE) || false
 /** Force truncate the database on start (`db.sync({ force: true })`) */
 export const START_FROM_SCRATCH = process.env.START_FROM_SCRATCH || false
 /** Interval per which the indexer checks for new block and epoch. */
-export const TICK = Number(process.env.TICK) || 500
+export const TICK = Number(process.env.TICK) || 1000
 
 export const GOVERNANCE_TRANSACTIONS = [
   "tx_vote_proposal.wasm",

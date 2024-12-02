@@ -139,7 +139,9 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   }
   validator = { ...validator.get() }
   validator.metadata ??= {}
-  const consensusAddresses = await (namadaAddress ? Query.validatorNamadaAddressToConsensusAddresses(namadaAddress) : Query.validatorPublicKeyToConsensusAddresses(publicKey))
+  const consensusAddresses = namadaAddress
+    ? await Query.validatorNamadaAddressToConsensusAddresses(namadaAddress)
+    : await Query.validatorPublicKeyToConsensusAddresses(publicKey)
   const lastSignedBlocks = []
   let uptime, currentHeight, countedBlocks
   if ('uptime' in req.query) {

@@ -180,6 +180,17 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   });
 }
 
+dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes (req, res) {
+  const { limit, offset } = pagination(req);
+  const where = { validator: req.params.address };
+  const order = [['proposal', 'DESC']]
+  const attrs = Query.defaultAttributes();
+  const { count, rows } = await DB.Vote.findAndCountAll({
+    limit, offset, where, attributes: attrs, order
+  });
+  res.status(200).send({ count, votes: rows });
+}
+
 dbRoutes['/proposals'] = async function dbProposals (req, res) {
   const { limit, offset } = pagination(req)
   const orderBy = req.query.orderBy ?? 'id';

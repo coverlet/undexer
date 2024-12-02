@@ -127,7 +127,11 @@ dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
 dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
   const publicKey = req.query.publicKey
-  const where = { publicKey, epoch }
+  const namadaAddress = req.query.address
+  if (publicKey && namadaAddress) {
+    return res.status(400).send({ error: "Don't use address and publicKey together" })
+  }
+  const where = { ...(namadaAddress? { namadaAddress }: { publicKey }), epoch }
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
   let validator = await DB.Validator.findOne({ where, attributes: attrs });
   if (validator === null) {
@@ -135,7 +139,9 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   }
   validator = { ...validator.get() }
   validator.metadata ??= {}
-  const consensusAddresses = await Query.validatorPublicKeyToConsensusAddresses(publicKey)
+  const consensusAddresses = namadaAddress
+    ? await Query.validatorNamadaAddressToConsensusAddresses(namadaAddress)
+    : await Query.validatorPublicKeyToConsensusAddresses(publicKey)
   const lastSignedBlocks = []
   let uptime, currentHeight, countedBlocks
   if ('uptime' in req.query) {

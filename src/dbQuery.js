@@ -615,6 +615,21 @@ export const validatorPublicKeyToConsensusAddresses = async (publicKey) => {
   return addresses
 }
 
+export const validatorNamadaAddressToConsensusAddresses = async (namadaAddress) => {
+  const addresses = new Set()
+  if (namadaAddress) {
+    const attributes = { include: [ 'consensusAddress' ] }
+    const where = { namadaAddress }
+    const records = await DB.Validator.findAll({ attributes, where })
+    for (const record of records) {
+      if ((record.consensusAddress||"").trim().length > 0) {
+        addresses.add(record.consensusAddress)
+      }
+    }
+  }
+  return addresses
+}
+
 export const defaultAttributes = (args = {}) => {
   const attrs = { exclude: ['createdAt', 'updatedAt'] }
   if (args instanceof Array) {

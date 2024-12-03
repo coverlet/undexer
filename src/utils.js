@@ -1,6 +1,11 @@
 import { Console, bold, colors } from '@hackbg/logs';
 import { DEFAULT_PAGE_SIZE } from './config.js';
 
+export const send200 = (res, data)  => res.status(200).send(data)
+export const send400 = (res, error) => res.status(400).send({ error })
+export const send404 = (res, error) => res.status(404).send({ error })
+export const send500 = (res, error) => res.status(500).send({ error })
+
 export function waitFor (msec) {
   return new Promise(resolve=>setTimeout(resolve, msec))
 }

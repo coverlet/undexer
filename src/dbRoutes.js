@@ -3,14 +3,11 @@ import { literal } from 'sequelize';
 import * as DB from './db.js';
 import * as Query from './dbQuery.js';
 import { CHAIN_ID } from './config.js';
-import { pagination, relativePagination, withConsole } from './utils.js';
+import {
+  pagination, relativePagination, withConsole, send200, send400, send404, send500
+} from './utils.js';
 
 const chainId = CHAIN_ID
-
-const send200 = (res, data)  => res.status(200).send(data)
-const send400 = (res, error) => res.status(400).send({ error })
-const send404 = (res, error) => res.status(404).send({ error })
-const send500 = (res, error) => res.status(500).send({ error })
 
 // Routes that respond with indexed data from the database.
 export const dbRoutes = {}

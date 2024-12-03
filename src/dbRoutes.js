@@ -8,45 +8,54 @@ import { pagination, relativePagination, withConsole } from './utils.js';
 
 const chainId = CHAIN_ID
 
+const send200 = (res, data)  => res.status(200).send(data)
+const send400 = (res, error) => res.status(400).send({ error })
+const send404 = (res, error) => res.status(404).send({ error })
+const send500 = (res, error) => res.status(500).send({ error })
+
 // Routes that respond with indexed data from the database.
 export const dbRoutes = {}
 
 dbRoutes['/'] = async function dbOverview (_req, res) {
   const timestamp = new Date().toISOString()
   const overview = await Query.overview()
-  res.status(200).send({ timestamp, chainId, ...overview })
+  return send200(res, { timestamp, chainId, ...overview })
 }
 
 dbRoutes['/epochs'] = async function dbEpochs (req, res) {
   const timestamp = new Date().toISOString()
   const { limit, before, after } = relativePagination(req)
   if (before && after) {
-    return res.status(400).send({ error: "Don't use before and after together" })
+    return send400(res, "Mutually exclusive query parameters: before, after")
   }
   const epochs = await Query.epochs({ limit, before, after })
-  res.status(200).send({ timestamp, epochs })
+  return send200(res, { timestamp, epochs })
 }
 
 dbRoutes['/status'] = async function dbStatus (_req, res) {
   const timestamp = new Date().toISOString()
   const status = await Query.status()
-  res.status(200).send({ timestamp, chainId, ...status })
+  return send200(res, { timestamp, chainId, ...status })
 }
 
 dbRoutes['/search'] = async function dbStatus (req, res) {
   const timestamp = new Date().toISOString()
   const { blocks, transactions, proposals } = await Query.search(req.query.q)
-  res.status(200).send({ timestamp, chainId, blocks, transactions, proposals, })
+  return send200(res, { timestamp, chainId, blocks, transactions, proposals })
 }
 
 dbRoutes['/blocks'] = async function dbBlocks (req, res) {
   const timestamp = new Date().toISOString()
   const { limit, before, after } = relativePagination(req)
-  if (before && after) return res.status(400).send({ error: "Don't use before and after together" })
-  if (!req?.query?.publicKey) return res.status(400).send({ error: "Missing query parameter: publicKey" })
+  if (before && after) {
+    return send400(res, "Mutually exclusive query parameters: before, after")
+  }
+  if (!req?.query?.publicKey) {
+    return send400(res, "Missing query parameter: publicKey")
+  }
   const query = { before, after, limit, publicKey: req?.query?.publicKey }
   const results = await Query.blocks(query)
-  res.status(200).send({ timestamp, chainId, ...results })
+  return send200(res, { timestamp, chainId, ...results })
 }
 
 dbRoutes['/block'] = async function dbBlock (req, res) {
@@ -55,11 +64,19 @@ dbRoutes['/block'] = async function dbBlock (req, res) {
   const { height, hash } = req.query
   const block = await Query.block({ height, hash })
   if (!block) {
-    return res.status(404).send({ error: 'Block not found' })
+    return send404(res, 'Block not found')
   }
   const transactions = await Query.transactionsAtHeight(block.blockHeight)
   const signers = block.blockData.result.block.last_commit.signatures.map(s=>s.validator_address)
-  return res.status(200).send({
+  const [proposerInfo, signersInfo] = await Promise.all([
+    Query.validatorByConsensusAddress(
+      block.blockHeader.proposerAddress
+    ),
+    Promise.all(signers.filter(Boolean).map(
+      signer=>Query.validatorByConsensusAddress(signer)
+    ))
+  ])
+  return send200(res, {
     timestamp,
     chainId,
     blockHeight:      block.blockHeight,
@@ -68,27 +85,27 @@ dbRoutes['/block'] = async function dbBlock (req, res) {
     epoch:            block.epoch,
     transactionCount: transactions.count,
     transactions:     transactions.rows.map(row => row.toJSON()),
-    proposer: await Query.validatorByConsensusAddress(
-      block.blockHeader.proposerAddress
-    ),
-    signers:  await Promise.all(signers.filter(Boolean).map(
-      signer=>Query.validatorByConsensusAddress(signer)
-    )),
+    proposer:         proposerInfo,
+    signers:          signersInfo,
   })
 }
 
 dbRoutes['/txs'] = async function dbTransactions (req, res) {
   const timestamp = new Date().toISOString()
   const { rows, count } = await Query.transactionList(pagination(req))
-  res.status(200).send({ timestamp, chainId, count, txs: rows })
+  return send200(res, { timestamp, chainId, count, txs: rows })
 } 
 
 dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
   const txHash = req?.params?.txHash
-  if (!txHash) return res.status(400).send({ error: 'Missing txHash parameter' })
+  if (!txHash) {
+    return send400(res, 'Missing URL parameter: txHash')
+  }
   const tx = await Query.transactionByHash(req.params.txHash);
-  if (tx === null) return res.status(404).send({ error: 'Transaction not found' });
-  res.status(200).send(tx);
+  if (tx === null) {
+    return send404(res, 'Transaction not found');
+  }
+  return send200(res, tx)
 }
 
 dbRoutes['/validators'] = async function dbValidators (req, res) {
@@ -104,7 +121,7 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
     where, order, limit, offset, attributes: attrs
   });
   const result = { count, validators: validators.map(v=>v.toJSON()) };
-  res.status(200).send(result);
+  return send200(res, result);
 }
 
 dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
@@ -118,22 +135,28 @@ dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
     states[validator?.state?.state] ??= 0
     states[validator?.state?.state] ++
   }
-  res.status(200).send(states)
+  return send200(res, states)
 }
 
 dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const publicKey = req?.query?.publicKey
   const namadaAddress = req?.query?.address
-  if (publicKey && namadaAddress) return res.status(400).send({ error: "Don't use address and publicKey together" })
-  if (!(publicKey || namadaAddress)) return res.status(400).send({ error: "Missing query parameter: address or publicKey" })
+  if (publicKey && namadaAddress) {
+    return send400(res, "Mutually exclusive query parameters: address, publicKey")
+  }
+  if (!(publicKey || namadaAddress)) {
+    return send400(res, "Missing query parameter: address or publicKey")
+  }
   const where = {}
   if (namadaAddress) where.namadaAddress = namadaAddress
   if (publicKey) where.publicKey = publicKey
   if (!isNaN(epoch)) where['epoch'] = epoch
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
   let validator = await DB.Validator.findOne({ where, attributes: attrs });
-  if (validator === null) return res.status(404).send({ error: 'Validator not found' })
+  if (validator === null) {
+    return send404(res, 'Validator not found')
+  }
   validator = { ...validator.get() }
   validator.metadata ??= {}
   const consensusAddresses = namadaAddress
@@ -168,29 +191,23 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
       }
     }
   }
-  res.status(200).send({
-    currentHeight,
-    ...validator,
-    uptime,
-    lastSignedBlocks,
-    countedBlocks,
-  });
+  return send200(res, { currentHeight, ...validator, uptime, lastSignedBlocks, countedBlocks });
 }
 
 dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res) {
   const { limit, offset } = pagination(req);
   const includeDelegated = req.query.delegated && req.query.delegated === 'true'
-  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
-  const where = { validator: req.params.address }
-  if (!includeDelegated) {
-    where.isValidator = true
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
   }
+  const where = { validator: req.params.address }
+  if (!includeDelegated) where.isValidator = true
   const order = [['proposal', 'DESC']]
   const attrs = Query.defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs, order
   });
-  res.status(200).send({ count, votes: rows });
+  return send200(res, { count, votes: rows });
 }
 
 dbRoutes['/proposals'] = async function dbProposals (req, res) {
@@ -207,9 +224,7 @@ dbRoutes['/proposals'] = async function dbProposals (req, res) {
   const { rows, count } = await DB.Proposal.findAndCountAll({
     order, limit, offset, where, attributes: attrs
   });
-  res.status(200).send({
-    count, proposals: rows
-  })
+  return send200(res, { count, proposals: rows })
 }
 
 dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
@@ -221,27 +236,29 @@ dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
     DB.Proposal.count({ where: { 'result.result':   'Passed'   } }),
     DB.Proposal.count({ where: { 'result.result':   'Rejected' } }),
   ])
-  res.status(200).send({ all, ongoing, upcoming, finished, passed, rejected })
+  return send200(res, { all, ongoing, upcoming, finished, passed, rejected })
 }
 
 dbRoutes['/proposal/:id'] = async function dbProposal (req, res) {
-  if (!req?.params?.id) return res.status(400).send({ error: 'Missing URL parameter: id' })
+  if (!req?.params?.id) {
+    return send400(res, 'Missing URL parameter: id')
+  }
   const id = req.params.id
   const result = await DB.Proposal.findOne({ where: { id }, attributes: Query.defaultAttributes(), });
-  return result
-    ? res.status(200).send(result.get())
-    : res.status(404).send({ error: 'Proposal not found' });
+  return result ? send200(res, result.get()) : send404(res, 'Proposal not found');
 }
 
 dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
-  if (!req?.params?.id) return res.status(400).send({ error: 'Missing URL parameter: id' })
+  if (!req?.params?.id) {
+    return send400(res, 'Missing URL parameter: id')
+  }
   const { limit, offset } = pagination(req);
   const where = { proposal: req.params.id };
   const attrs = Query.defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs,
   });
-  res.status(200).send({ count, votes: rows });
+  return send200(res, { count, votes: rows });
 }
 
 dbRoutes['/transfers'] = async function dbTransfers (req, res) {
@@ -251,11 +268,13 @@ dbRoutes['/transfers'] = async function dbTransfers (req, res) {
     Query.transferCount({ address, source, target }),
     Query.transferList({ address, source, target, limit, offset }),
   ])
-  res.status(200).send({ count, transfers })
+  return send200(res, { count, transfers })
 }
 
 dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
-  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
   const { address } = req.params;
   const { limit, offset } = pagination(req)
   try {
@@ -263,24 +282,26 @@ dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (re
       Query.txWithAddressCount({ address }),
       Query.txWithAddressList({ address, limit, offset }),
     ])
-    res.status(200).send({ count, transactions });
+    return send200(res, { count, transactions });
   } catch (error) {
     console.error('Error fetching transactions:', error);
-    res.status(500).send({ error: 'Failed to fetch transactions' });
+    return send500(res, 'Failed to fetch transactions');
   }
 }
 
 dbRoutes['/balances/:address'] = async function dbBalances (req, res) {
-  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
   const { address } = req.params;
   try {
     const chain = await RPC.default();
     const tokens = TOKENS.map(token=>token.address);
     const balances = await chain.fetchBalance(address, tokens);
-    res.status(200).send({ balances: balances[address] });
+    return send200(res, { balances: balances[address] });
   } catch (error) {
     console.error('Error fetching balances:', error);
-    res.status(500).send({ error: 'Failed to fetch balances' });
+    return send500(res, 'Failed to fetch balances');
   }
 }
 

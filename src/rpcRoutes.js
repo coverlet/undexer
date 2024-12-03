@@ -47,18 +47,18 @@ rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_)
   return { ...rpcResponseMeta(chain), ...await chain.fetchPGFParameters() }
 }
 
-rpcRoutes['/balances/:address'] = chain => async function dbBalances (req, res) {
+rpcRoutes['/balances/:address'] = chain => async function dbBalances (req, _) {
   if (!req?.params?.address) {
-    return send400(res, 'Missing URL parameter: address')
+    throw new Error('Missing URL parameter: address', { code: 400 });
   }
   const { address } = req.params;
   try {
     const tokens = TOKENS.map(token=>token.address);
     const balances = await chain.fetchBalance(address, tokens);
-    return send200(res, { balances: balances[address] });
+    return { balances: balances[address] }
   } catch (error) {
     console.error('Error fetching balances:', error);
-    return send500(res, 'Failed to fetch balances');
+    throw new Error('Failed to fetch balances');
   }
 }
 
@@ -74,7 +74,7 @@ export function addRpcRoutes (router, rpcs) {
         result = await Promise.any(rpcs.map(rpc=>rpc.then(rpc=>handler(rpc)(req))))
       } catch (e) {
         console.error(e)
-        res.status(500).send({ error: e.message })
+        res.status(e.code||500).send({ error: e.message })
       }
       res.status(200).send(filterBigInts(result))
     }))

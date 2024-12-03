@@ -26,16 +26,22 @@ export default db
 
 export async function initDb () {
   let dbName
+  let host
   try {
-    const { username, password, hostname, port, pathname } = new URL(DATABASE_URL)
+    const url = new URL(DATABASE_URL)
+    const { username, password, hostname, port, pathname } = url
+    host = url.host
     dbName = pathname.slice(1) || CHAIN_ID
-    console.log(`Creating database "${dbName}"...`)
+    console.debug(`Connecting to ${host}...`)
     const pg = new PG.Client({ user: username, password, host: hostname, port })
+    console.debug(`Connected to ${host}`)
     await pg.connect()
-    await pg.query(`CREATE DATABASE "${dbName}"`)
+    console.debug(`Ensuring database "${dbName}" at ${host}...`)
+    await pg.query(`CREATE DATABASE "${dbName}";`)
+    console.debug(`Created database "${dbName}" at ${host}`)
   } catch (e) {
     if (e.code === '42P04') {
-      console.info(`Database "${dbName}" exists.`)
+      console.debug(`Database "${dbName}" already exists.`)
     } else {
       if (e.code === 'ECONNREFUSED') {
         console.error(`Connection refused. Make sure Postgres is running at ${e.address}:${e.port}`)
@@ -49,6 +55,7 @@ export async function initDb () {
   // Allow sorting strings as numbers.
   // See https://github.com/sequelize/sequelize/discussions/15529#discussioncomment-4601186
   try {
+    console.debug(`Ensuring numeric collation in "${dbName}" at ${host}...`)
     await db.query(`CREATE COLLATION IF NOT EXISTS numeric (provider = icu, locale = 'en-u-kn-true')`)
   } catch (e) {
     console.error(e)

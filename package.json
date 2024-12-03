@@ -33,7 +33,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
+    "@hackbg/port": "workspace:./fadroma/toolbox/port",
     "concurrently": "7.2.2",
+    "pgmock": "^1.0.3",
     "tsx": "^4.15.6"
   }
 }

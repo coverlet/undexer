@@ -98,7 +98,7 @@ dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
 
 dbRoutes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
-  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
+  const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const { state } = req.query
   const where = { epoch }
   if (state) where['state.state'] = state
@@ -112,7 +112,7 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
 }
 
 dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
-  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
+  const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const states = {}
   for (const validator of await DB.Validator.findAll({
     where: { epoch },
@@ -125,7 +125,7 @@ dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
 }
 
 dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
-  const epoch = await Query.latestEpochForValidators(req?.query?.epoch)
+  const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const publicKey = req.query.publicKey
   const namadaAddress = req.query.address
   if (publicKey && namadaAddress) {

@@ -183,10 +183,10 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
 dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res) {
   const { limit, offset } = pagination(req);
   const includeDelegated = req.query.delegated && req.query.delegated === 'true'
-  const where = {
-    ...(includeDelegated ?
-      {} : { isValidator: true }), validator: req.params.address
-  };
+  const where = { validator: req.params.address }
+  if (!includeDelegated) {
+    where.isValidator = true
+  }
   const order = [['proposal', 'DESC']]
   const attrs = Query.defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({

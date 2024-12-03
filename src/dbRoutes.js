@@ -42,9 +42,8 @@ dbRoutes['/search'] = async function dbStatus (req, res) {
 dbRoutes['/blocks'] = async function dbBlocks (req, res) {
   const timestamp = new Date().toISOString()
   const { limit, before, after } = relativePagination(req)
-  if (before && after) {
-    return res.status(400).send({ error: "Don't use before and after together" })
-  }
+  if (before && after) return res.status(400).send({ error: "Don't use before and after together" })
+  if (!req?.query?.publicKey) return res.status(400).send({ error: "Missing query parameter: publicKey" })
   const query = { before, after, limit, publicKey: req?.query?.publicKey }
   const results = await Query.blocks(query)
   res.status(200).send({ timestamp, chainId, ...results })
@@ -124,18 +123,17 @@ dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
 
 dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
-  const publicKey = req.query.publicKey
-  const namadaAddress = req.query.address
-  if (publicKey && namadaAddress) {
-    return res.status(400).send({ error: "Don't use address and publicKey together" })
-  }
-  const where = { ...(namadaAddress? { namadaAddress }: { publicKey }) }
+  const publicKey = req?.query?.publicKey
+  const namadaAddress = req?.query?.address
+  if (publicKey && namadaAddress) return res.status(400).send({ error: "Don't use address and publicKey together" })
+  if (!(publicKey || namadaAddress)) return res.status(400).send({ error: "Missing query parameter: address or publicKey" })
+  const where = {}
+  if (namadaAddress) where.namadaAddress = namadaAddress
+  if (publicKey) where.publicKey = publicKey
   if (!isNaN(epoch)) where['epoch'] = epoch
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
   let validator = await DB.Validator.findOne({ where, attributes: attrs });
-  if (validator === null) {
-    return res.status(404).send({ error: 'Validator not found' })
-  }
+  if (validator === null) return res.status(404).send({ error: 'Validator not found' })
   validator = { ...validator.get() }
   validator.metadata ??= {}
   const consensusAddresses = namadaAddress
@@ -182,6 +180,7 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
 dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res) {
   const { limit, offset } = pagination(req);
   const includeDelegated = req.query.delegated && req.query.delegated === 'true'
+  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
   const where = { validator: req.params.address }
   if (!includeDelegated) {
     where.isValidator = true
@@ -226,6 +225,7 @@ dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
 }
 
 dbRoutes['/proposal/:id'] = async function dbProposal (req, res) {
+  if (!req?.params?.id) return res.status(400).send({ error: 'Missing URL parameter: id' })
   const id = req.params.id
   const result = await DB.Proposal.findOne({ where: { id }, attributes: Query.defaultAttributes(), });
   return result
@@ -234,6 +234,7 @@ dbRoutes['/proposal/:id'] = async function dbProposal (req, res) {
 }
 
 dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
+  if (!req?.params?.id) return res.status(400).send({ error: 'Missing URL parameter: id' })
   const { limit, offset } = pagination(req);
   const where = { proposal: req.params.id };
   const attrs = Query.defaultAttributes();
@@ -254,6 +255,7 @@ dbRoutes['/transfers'] = async function dbTransfers (req, res) {
 }
 
 dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
+  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
   const { address } = req.params;
   const { limit, offset } = pagination(req)
   try {
@@ -269,6 +271,7 @@ dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (re
 }
 
 dbRoutes['/balances/:address'] = async function dbBalances (req, res) {
+  if (!req?.params?.address) return res.status(400).send({ error: 'Missing URL parameter: address' })
   const { address } = req.params;
   try {
     const chain = await RPC.default();

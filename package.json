@@ -13,8 +13,8 @@
     "cli": "node undexer",
     "build:wasm:dev": "cd fadroma/packages/namada && pnpm build:wasm:dev",
     "build:wasm:prod": "cd fadroma/packages/namada && pnpm build:wasm:prod",
-    "test": "./tests/test.js",
-    "cov": "c8 -x fadroma ./tests/test.js"
+    "test": "time ./tests/test.js",
+    "cov": "time c8 -x fadroma ./tests/test.js"
   },
   "dependencies": {
     "@fadroma/namada": "workspace:./fadroma/packages/namada",

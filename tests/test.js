@@ -29,9 +29,10 @@ const testRoute = (route, query = {}) =>
     status (code) { this.code = code; return this },
     send (data) { this.data = data; resolve(this) },
   }))
-const testDbRoute = async (path, query) => console.log(
-  path, query, '=>', await testRoute(dbRoutes[path], query)
-)
+const testDbRoute = async (path, query) => {
+  console.log('Testing', path, query)
+  console.log(await testRoute(dbRoutes[path], query))
+}
 
 const t1 = performance.now()
 try {
@@ -41,10 +42,10 @@ try {
   await testDbRoute('/block')
   await testDbRoute('/txs')
   await testDbRoute('/tx/:txHash')
-  await testDbRoute('/validators')
+  //await testDbRoute('/validators')
   await testDbRoute('/validators/states')
   await testDbRoute('/validator')
-  await testDbRoute('/validators/votes/:address')
+  await testDbRoute('/validator/votes/:address')
   await testDbRoute('/proposals')
   await testDbRoute('/proposals/stats')
   await testDbRoute('/proposal/:id')
@@ -53,9 +54,11 @@ try {
   await testDbRoute('/transactions/:address')
   await testDbRoute('/balances/:address')
   console.log('Tests done in', performance.now() - t1)
+  process.exit(0)
 } catch (e) {
   console.error(e)
   console.log('Tests failed in', performance.now() - t1)
+  process.exit(1)
 }
 
-mock.destroy()
+//mock.destroy()

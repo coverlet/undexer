@@ -85,6 +85,8 @@ dbRoutes['/txs'] = async function dbTransactions (req, res) {
 } 
 
 dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
+  const txHash = req?.params?.txHash
+  if (!txHash) return res.status(400).send({ error: 'Missing txHash parameter' })
   const tx = await Query.transactionByHash(req.params.txHash);
   if (tx === null) return res.status(404).send({ error: 'Transaction not found' });
   res.status(200).send(tx);
@@ -94,7 +96,8 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const { state } = req.query
-  const where = { epoch }
+  const where = {}
+  if (!isNaN(epoch)) where['epoch'] = epoch
   if (state) where['state.state'] = state
   const order = [literal('"stake" collate "numeric" DESC')]
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
@@ -108,9 +111,10 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
 dbRoutes['/validators/states'] = async function dbValidatorStates (req, res) {
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const states = {}
+  const where = {}
+  if (!isNaN(epoch)) where['epoch'] = epoch
   for (const validator of await DB.Validator.findAll({
-    where: { epoch },
-    attributes: { include: [ 'state' ] }
+    where, attributes: { include: [ 'state' ] }
   })) {
     states[validator?.state?.state] ??= 0
     states[validator?.state?.state] ++
@@ -125,7 +129,8 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   if (publicKey && namadaAddress) {
     return res.status(400).send({ error: "Don't use address and publicKey together" })
   }
-  const where = { ...(namadaAddress? { namadaAddress }: { publicKey }), epoch }
+  const where = { ...(namadaAddress? { namadaAddress }: { publicKey }) }
+  if (!isNaN(epoch)) where['epoch'] = epoch
   const attrs = Query.defaultAttributes({ exclude: ['id'] })
   let validator = await DB.Validator.findOne({ where, attributes: attrs });
   if (validator === null) {

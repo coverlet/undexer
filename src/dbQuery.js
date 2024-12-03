@@ -41,7 +41,7 @@ export const oldestBlock = () =>
 export const totalValidators = async (epoch) => {
   epoch = await latestEpochFromValidators(epoch)
   const where = {}
-  if (epoch) where.epoch = epoch
+  if (!isNaN(epoch)) where.epoch = epoch
   DB.Validator.count({ where })
 }
 

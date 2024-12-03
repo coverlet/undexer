@@ -34,9 +34,28 @@ const testDbRoute = async (path, query) => console.log(
 )
 
 const t1 = performance.now()
-await testDbRoute('/')
-await testDbRoute('/status')
-await testDbRoute('/search')
-console.log('Tests done in', performance.now() - t1)
+try {
+  await testDbRoute('/')
+  await testDbRoute('/status')
+  await testDbRoute('/search')
+  await testDbRoute('/block')
+  await testDbRoute('/txs')
+  await testDbRoute('/tx/:txHash')
+  await testDbRoute('/validators')
+  await testDbRoute('/validators/states')
+  await testDbRoute('/validator')
+  await testDbRoute('/validators/votes/:address')
+  await testDbRoute('/proposals')
+  await testDbRoute('/proposals/stats')
+  await testDbRoute('/proposal/:id')
+  await testDbRoute('/proposal/votes/:id')
+  await testDbRoute('/transfers')
+  await testDbRoute('/transactions/:address')
+  await testDbRoute('/balances/:address')
+  console.log('Tests done in', performance.now() - t1)
+} catch (e) {
+  console.error(e)
+  console.log('Tests failed in', performance.now() - t1)
+}
 
 mock.destroy()

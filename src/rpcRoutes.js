@@ -1,6 +1,7 @@
 import express from 'express'
 import { withConsole } from './utils.js'
 import { filterBigInts } from './utils.js';
+import { TOKENS } from './config.js';
 
 // Routes that respond with data queried directly from RPC endpoints.
 export const rpcRoutes = {}
@@ -45,6 +46,21 @@ rpcRoutes['/parameters/governance'] = chain => async function multiRpcGovernance
 
 rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_) {
   return { ...rpcResponseMeta(chain), ...await chain.fetchPGFParameters() }
+}
+
+rpcRoutes['/balances/:address'] = chain => async function dbBalances (req, res) {
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
+  const { address } = req.params;
+  try {
+    const tokens = TOKENS.map(token=>token.address);
+    const balances = await chain.fetchBalance(address, tokens);
+    return send200(res, { balances: balances[address] });
+  } catch (error) {
+    console.error('Error fetching balances:', error);
+    return send500(res, 'Failed to fetch balances');
+  }
 }
 
 export default function getRpcRouter (rpcs) {

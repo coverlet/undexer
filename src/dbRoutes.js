@@ -1,9 +1,8 @@
 import express from 'express'
 import { literal } from 'sequelize';
 import * as DB from './db.js';
-import * as RPC from './rpc.js';
 import * as Query from './dbQuery.js';
-import { TOKENS, CHAIN_ID } from './config.js';
+import { CHAIN_ID } from './config.js';
 import { pagination, relativePagination, withConsole } from './utils.js';
 
 const chainId = CHAIN_ID
@@ -286,22 +285,6 @@ dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (re
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return send500(res, 'Failed to fetch transactions');
-  }
-}
-
-dbRoutes['/balances/:address'] = async function dbBalances (req, res) {
-  if (!req?.params?.address) {
-    return send400(res, 'Missing URL parameter: address')
-  }
-  const { address } = req.params;
-  try {
-    const chain = await RPC.default();
-    const tokens = TOKENS.map(token=>token.address);
-    const balances = await chain.fetchBalance(address, tokens);
-    return send200(res, { balances: balances[address] });
-  } catch (error) {
-    console.error('Error fetching balances:', error);
-    return send500(res, 'Failed to fetch balances');
   }
 }
 

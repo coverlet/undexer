@@ -29,10 +29,14 @@ const testRoute = (route, query = {}) =>
     status (code) { this.code = code; return this },
     send (data) { this.data = data; resolve(this) },
   }))
-const testDbRoute = (path, query) => testRoute(dbRoutes[path], query)
+const testDbRoute = async (path, query) => console.log(
+  path, query, '=>', await testRoute(dbRoutes[path], query)
+)
 
 const t1 = performance.now()
-console.log(await testDbRoute('/'))
+await testDbRoute('/')
+await testDbRoute('/status')
+await testDbRoute('/search')
 console.log('Tests done in', performance.now() - t1)
 
 mock.destroy()

@@ -33,16 +33,10 @@ dbRoutes['/status'] = async function dbStatus (_req, res) {
   res.status(200).send({ timestamp, chainId, ...status })
 }
 
-dbRoutes['/search'] = async function dbStatus (_req, res) {
+dbRoutes['/search'] = async function dbStatus (req, res) {
   const timestamp = new Date().toISOString()
-  const status = await Query.status()
-  res.status(200).send({ timestamp, chainId, ...status })
-}
-
-dbRoutes['/status'] = async function dbStatus (_req, res) {
-  const timestamp = new Date().toISOString()
-  const status = await Query.status()
-  res.status(200).send({ timestamp, chainId, ...status })
+  const { blocks, transactions, proposals } = await Query.search(req.query.q)
+  res.status(200).send({ timestamp, chainId, blocks, transactions, proposals, })
 }
 
 dbRoutes['/blocks'] = async function dbBlocks (req, res) {

@@ -49,10 +49,10 @@ dbRoutes['/blocks'] = async function dbBlocks (req, res) {
   if (before && after) {
     return send400(res, "Mutually exclusive query parameters: before, after")
   }
-  if (!req?.query?.publicKey) {
-    return send400(res, "Missing query parameter: publicKey")
-  }
   const query = { before, after, limit, publicKey: req?.query?.publicKey }
+  if (req?.query?.publicKey) {
+    query.publicKey = req.query.publicKey
+  }
   const results = await Query.blocks(query)
   return send200(res, { timestamp, chainId, ...results })
 }

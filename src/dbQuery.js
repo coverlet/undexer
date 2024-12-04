@@ -261,7 +261,7 @@ export const transactionByHash = txHash => {
 export const transactionList = ({ limit, offset } = {}) =>
   DB.Transaction.findAndCountAll({
     attributes: defaultAttributes({ exclude: ['id'] }),
-    order: [['txTime', 'DESC']],
+    order: [['blockTime', 'DESC']],
     limit,
     offset,
   })

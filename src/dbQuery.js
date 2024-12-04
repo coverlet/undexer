@@ -42,7 +42,7 @@ export const totalValidators = async (epoch) => {
   epoch = await latestEpochFromValidators(epoch)
   const where = {}
   if (!isNaN(epoch)) where.epoch = epoch
-  DB.Validator.count({ where })
+  return DB.Validator.count({ where })
 }
 
 export const overview = ({ limit = 10 } = {}) => intoRecord({

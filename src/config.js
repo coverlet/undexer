@@ -26,13 +26,13 @@ export const GOVERNANCE_TRANSACTIONS = [
 
 const token = (address, symbol, coin) => ({address, symbol, coin})
 export const TOKENS = [
-  token("tnam1q8ctk7tr337f85dw69q0rsrggasxjjf5jq2s2wph", "NAM", "Namada"),
-  token("tnam1qyfl072lhaazfj05m7ydz8cr57zdygk375jxjfwx", "DOT", "Polkadot"),
-  token("tnam1qxvnvm2t9xpceu8rup0n6espxyj2ke36yv4dw6q5", "ETH", "Ethereum"),
-  token("tnam1qy8qgxlcteehlk70sn8wx2pdlavtayp38vvrnkhq", "BTC", "Bitcoin"),
-  token("tnam1q9f5yynt5qfxe28ae78xxp7wcgj50fn4syetyrj6", "SCH", "Schnitzel"),
-  token("tnam1qyvfwdkz8zgs9n3qn9xhp8scyf8crrxwuq26r6gy", "APF", "Apfel"),
-  token("tnam1qyx93z5ma43jjmvl0xhwz4rzn05t697f3vfv8yuj", "KAR", "Kartoffel")
+  token("tnam1q9gr66cvu4hrzm0sd5kmlnjje82gs3xlfg3v6nu7", "NAM", "Namada"),
+  //token("tnam1qyfl072lhaazfj05m7ydz8cr57zdygk375jxjfwx", "DOT", "Polkadot"),
+  //token("tnam1qxvnvm2t9xpceu8rup0n6espxyj2ke36yv4dw6q5", "ETH", "Ethereum"),
+  //token("tnam1qy8qgxlcteehlk70sn8wx2pdlavtayp38vvrnkhq", "BTC", "Bitcoin"),
+  //token("tnam1q9f5yynt5qfxe28ae78xxp7wcgj50fn4syetyrj6", "SCH", "Schnitzel"),
+  //token("tnam1qyvfwdkz8zgs9n3qn9xhp8scyf8crrxwuq26r6gy", "APF", "Apfel"),
+  //token("tnam1qyx93z5ma43jjmvl0xhwz4rzn05t697f3vfv8yuj", "KAR", "Kartoffel")
 ]
 
 import { fileURLToPath } from 'node:url'

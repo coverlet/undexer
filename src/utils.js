@@ -95,7 +95,7 @@ export function withConsole (handler) {
 export function pagination (req) {
   return {
     offset: Math.max(0,   req.query.offset ? Number(req.query.offset) : 0),
-    limit:  Math.min(100, req.query.limit  ? Number(req.query.limit)  : DEFAULT_PAGE_SIZE),
+    limit:  Math.min(200, req.query.limit  ? Number(req.query.limit)  : DEFAULT_PAGE_SIZE),
   }
 }
 
@@ -104,7 +104,7 @@ export function relativePagination (req) {
   return {
     before: Math.max(0,   req.query.before || 0),
     after:  Math.max(0,   req.query.after  || 0),
-    limit:  Math.min(100, req.query.limit ? Number(req.query.limit) : DEFAULT_PAGE_SIZE),
+    limit:  Math.min(200, req.query.limit ? Number(req.query.limit) : DEFAULT_PAGE_SIZE),
   }
 }
 

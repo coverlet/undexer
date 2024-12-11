@@ -1,5 +1,5 @@
 import express from 'express'
-import { literal } from 'sequelize';
+import { literal, fn, cast, col } from 'sequelize';
 import * as DB from './db.js';
 import * as Query from './dbQuery.js';
 import { CHAIN_ID } from './config.js';
@@ -235,13 +235,36 @@ dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
   return send200(res, { all, ongoing, upcoming, finished, passed, rejected })
 }
 
-dbRoutes['/proposal/:id'] = async function dbProposal (req, res) {
+dbRoutes['/proposal/:id'] = async function dbProposal(req, res) {
   if (!req?.params?.id) {
     return send400(res, 'Missing URL parameter: id')
   }
   const id = req.params.id
+
+  const [{ totalYayPower }] = await DB.Vote.findAll({
+    raw: true,
+    attributes: [[fn('SUM', cast(col('power'), 'bigint')), 'totalYayPower']],
+    where: { proposal: id, data: 'Yay' }
+  })
+  const [{ totalNayPower }] = await DB.Vote.findAll({
+    raw: true,
+    attributes: [[fn('SUM', cast(col('power'), 'bigint')), 'totalNayPower']],
+    where: { proposal: id, data: 'Nay' }
+  })
+  const [{ totalAbstainPower }] = await DB.Vote.findAll({
+    raw: true,
+    attributes: [[fn('SUM', cast(col('power'), 'bigint')), 'totalAbstainPower']],
+    where: { proposal: id, data: 'Abstain' }
+  })
+  const [{ totalVotingPower }] = await DB.Vote.findAll({
+    raw: true,
+    attributes: [[fn('SUM', cast(col('power'), 'bigint')), 'totalVotingPower']],
+    where: { proposal: id }
+  })
+  const votingResults = { totalYayPower, totalNayPower, totalAbstainPower, totalVotingPower }
+
   const result = await DB.Proposal.findOne({ where: { id }, attributes: Query.defaultAttributes(), });
-  return result ? send200(res, result.get()) : send404(res, 'Proposal not found');
+  return result ? send200(res, { ...(result.get()), votingResults }) : send404(res, 'Proposal not found');
 }
 
 dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {

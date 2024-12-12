@@ -9,7 +9,7 @@ import { rpcVariant } from '../src/rpc.js';
 
 const { SERVER_PORT = 8888, RPCS } = process.env
 const rpcUrls = RPCS ? RPCS.split(',').map(x=>x.trim()) : [
-  'https://rpc.namada-dryrun.tududes.com/',
+  //'https://rpc.namada-dryrun.tududes.com/',
   'https://namada-rpc.mandragora.io',
 ];
 if (rpcUrls.length > 0) {

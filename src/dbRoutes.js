@@ -273,6 +273,10 @@ dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   }
   const { limit, offset } = pagination(req);
   const where = { proposal: req.params.id };
+  const { voter } = req.query
+  if(voter) {
+    where.delegator = voter
+  }
   const attrs = Query.defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs,

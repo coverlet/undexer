@@ -210,7 +210,6 @@ dbRoutes['/bonds'] = async function dbBonds (req, res) {
   const { limit, offset } = pagination(req)
   const { validator, delegator, source = delegator } = req?.query ?? {}
   if (source != delegator) return send400(rer, "Use source or delegator (equivalent)")
-  console.log(DB)
   const [count, bonds] = await Promise.all([
     Query.bondCount({ source, validator }),
     Query.bondList({ source, validator, limit, offset })

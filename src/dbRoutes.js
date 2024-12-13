@@ -280,6 +280,60 @@ dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   return send200(res, { count, votes: rows });
 }
 
+dbRoutes['/proposal/votes/:id/validators'] = async function dbProposalVotes(req, res) {
+  if (!req?.params?.id) {
+    return send400(res, 'Missing URL parameter: id')
+  }
+  const proposal = req.params.id
+
+  const validators = await DB.Vote.findAll({
+    raw: true,
+    attributes: [[fn('DISTINCT', col('validator')), 'validator']],
+    where: { proposal }
+  })
+  const validatorVotes = await DB.Vote.findAll({
+    attributes: Query.defaultAttributes(), where: { isValidator: true, proposal }
+  })
+
+  const result = validators.map(({ validator }) => ({
+    validator, vote: validatorVotes.find(vote => vote.validator == validator)
+  })).sort((a, b) => {
+    const powerA = BigInt(a.vote?.power ? a.vote.power : 0)
+    const powerB = BigInt(b.vote?.power ? b.vote.power : 0)
+    if (powerA > powerB) {
+      return -1;
+    } else if (powerA < powerB) {
+      return 1;
+    } else {
+      return 0;
+    }
+  })
+
+  return send200(res, result);
+}
+
+dbRoutes['/proposal/votes/:id/validator/:address'] = async function dbProposalVotes(req, res) {
+  if (!req?.params?.id) {
+    return send400(res, 'Missing URL parameter: id')
+  }
+
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
+
+  const where = { proposal: req.params.id, validator: req.params.address };
+  const attributes = Query.defaultAttributes();
+  const order = [literal('"power" collate "numeric" DESC')]
+
+  const votes = await DB.Vote.findAll({
+    attributes,
+    where,
+    order
+  })
+
+  return send200(res, votes);
+}
+
 dbRoutes['/transfers'] = async function dbTransfers (req, res) {
   const { limit, offset } = pagination(req)
   const { address, source, target } = req.query

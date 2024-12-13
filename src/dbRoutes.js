@@ -206,6 +206,29 @@ dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res
   return send200(res, { count, votes: rows });
 }
 
+dbRoutes['/bonds'] = async function dbBonds (req, res) {
+  const { limit, offset } = pagination(req)
+  const { validator, delegator, source = delegator } = req?.query ?? {}
+  if (source != delegator) return send400(rer, "Use source or delegator (equivalent)")
+  console.log(DB)
+  const [count, bonds] = await Promise.all([
+    Query.bondCount({ source, validator }),
+    Query.bondList({ source, validator, limit, offset })
+  ])
+  return send200(res, { count, bonds })
+}
+
+dbRoutes['/unbonds'] = async function dbBonds (req, res) {
+  const { limit, offset } = pagination(req)
+  const { validator, delegator, source = delegator } = req?.query ?? {}
+  if (source != delegator) return send400(req, "Use source or delegator (equivalent)")
+  const [count, unbonds] = await Promise.all([
+    Query.unbondCount({ source, validator }),
+    Query.unbondList({ source, validator, limit, offset })
+  ])
+  return send200(res, { count, unbonds })
+}
+
 dbRoutes['/proposals'] = async function dbProposals (req, res) {
   const { limit, offset } = pagination(req)
   const orderBy = req.query.orderBy ?? 'id';

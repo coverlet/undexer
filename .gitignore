@@ -6,7 +6,8 @@ data/*
 !package.json
 !tsconfig.json
 !jsconfig.json
-.env.*
+.env*
+!.env.example
 .DS_Store
 rust/target/*
 .pnpm-store

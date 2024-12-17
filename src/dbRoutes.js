@@ -3,6 +3,7 @@ import { literal, fn, cast, col } from 'sequelize';
 import * as DB from './db.js';
 import * as Query from './dbQuery.js';
 import { CHAIN_ID } from './config.js';
+import { Op } from "sequelize";
 import {
   pagination, relativePagination, withConsole, send200, send400, send404, send500
 } from './utils.js';

@@ -7,3 +7,5 @@ docker
 docker-compose.yml
 lighttpd.conf
 fadroma/packages/namada/target
+fadroma/examples
+fadroma/fixtures

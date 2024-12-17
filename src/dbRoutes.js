@@ -108,7 +108,9 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const { state } = req.query
-  const where = {}
+  const where = {
+    stake: {[Op.ne]: null}
+  }
   if (!isNaN(epoch)) where['epoch'] = epoch
   if (state) where['state.state'] = state
   const order = [literal('"stake" collate "numeric" DESC')]

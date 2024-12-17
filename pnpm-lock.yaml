@@ -50,6 +50,9 @@ importers:
       sequelize:
         specifier: ^6.37.3
         version: 6.37.3(pg@8.12.0)
+      slonik:
+        specifier: ^46.2.0
+        version: 46.2.0(zod@3.24.1)
       undici:
         specifier: ^6.19.2
         version: 6.19.8
@@ -2247,6 +2250,42 @@ packages:
   '@sinonjs/text-encoding@0.7.3':
     resolution: {integrity: sha512-DE427ROAphMQzU4ENbliGYrBSYPXF+TtLg9S8vzeA+OF4ZKzoDdzfL8sxuMUGS/lgRhM6j1URSk9ghf7Xo1tyA==}
 
+  '@slonik/driver@46.2.0':
+    resolution: {integrity: sha512-N0BPxFeMKWG7M8MwvOV/jqmzsVqVG7RbN3Fz/67f9UncmUj4N5fL6evI/YKaT9GS+gtrGzvI85o0w6v0FaWvHA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
+  '@slonik/errors@46.2.0':
+    resolution: {integrity: sha512-5t6VLcdPIE9yC2hR8eTqDum23uleTPg9Nm66Ici0XGdJj7jqogI9bcT+ZFcQH7q6a+zjb7D5z5wr5f3pOtNG6g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
+  '@slonik/pg-driver@46.2.0':
+    resolution: {integrity: sha512-suz514Rcz8M4MXGctNnKQTT/B9Y3g4XInQRUr7F10UsKgNsqYdtB+vHtnKPMtMB23NpJGs+R+RBHVYlRn0/xxA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
+  '@slonik/sql-tag@46.2.0':
+    resolution: {integrity: sha512-wtgwtad8/VU60uHJ3UuQ4dtGCMucl6iZvUCixZT6HzGK4z/11COLU89l2HRU803wSTIWVsQkZlRSiRYEwkYE2A==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
+  '@slonik/types@46.2.0':
+    resolution: {integrity: sha512-Sm/4WUr1aySDVJ5iyQ0iO3OWhSHsXFJeDtdia8xvbcUDOQ+7OZnEn7MbZ81WHXGO90g3pd9ldFTzrnOMZEV2QQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
+  '@slonik/utilities@46.2.0':
+    resolution: {integrity: sha512-2gNT3Bygn6tVKJgF2kHfu3yCelmxA4rihpuhtpdLbrfvlTuJ7DCbJVt7VFcanA2VPYrKvFzyWC5Jp7l3ndKwxA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
+
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
@@ -4220,6 +4259,10 @@ packages:
   fast-levenshtein@2.0.6:
     resolution: {integrity: sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw==}
 
+  fast-printf@1.6.10:
+    resolution: {integrity: sha512-GwTgG9O4FVIdShhbVF3JxOgSBY2+ePGsu2V/UONgoCPzF9VY6ZdBMKsHKCYQHZwNk3qNouUolRDsgVxcVA5G1w==}
+    engines: {node: '>=10.0'}
+
   fast-querystring@1.1.2:
     resolution: {integrity: sha512-g6KuKWmFXc0fID8WWH0jit4g0AGBoJhCkJMb1RmbsSEUNvQ+ZC8D6CUZ+GtF8nMzSPXnhiePyyqqipzNNEnHjg==}
 
@@ -4465,6 +4508,10 @@ packages:
   get-package-type@0.1.0:
     resolution: {integrity: sha512-pjzuKtY64GYfWizNAJ0fr9VqttZkNiK2iS430LtIHzjBEr6bX8Am2zm4sW4Ro5wjWW5cAlRL1qAMTcXbjNAO2Q==}
     engines: {node: '>=8.0.0'}
+
+  get-stack-trace@3.1.1:
+    resolution: {integrity: sha512-E1rM+umbm9MlMp6zNSap+UI8VVWWmAoUxiAHp1Ron1FV2dM99mgMAHS1tGAGO/ceBjgOXz24GC47aLeNN1llrA==}
+    engines: {node: '>=18.0'}
 
   get-stream@6.0.1:
     resolution: {integrity: sha512-ts6Wi+2j3jQjqi70w5AlN8DFnkSwC+MqmxEzdEALB2qXZYV3X/b1CTfgPLGJNMeAWxdPfU8FO1ms3NUfaHCPYg==}
@@ -5074,6 +5121,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  iso8601-duration@1.3.0:
+    resolution: {integrity: sha512-K4CiUBzo3YeWk76FuET/dQPH03WE04R94feo5TSKQCXpoXQt9E4yx2CnY737QZnSAI3PI4WlKo/zfqizGx52QQ==}
 
   isobject@2.1.0:
     resolution: {integrity: sha512-+OUdGJlgjOBZDfxnDjYYG6zp487z0JGNQq3cYQYg5f5hKR+syHMsaztzGeml/4kGG55CSpKSpWTY+jYGgsHLgA==}
@@ -5995,6 +6045,9 @@ packages:
     resolution: {integrity: sha512-yBYjY9QX2hnRmZHAjG/f13MzmBzxzYgQhFrke06TTyKY5zSTEqkOeukBzIdVA3j3ulu8Qa3MbVFShV7T2RmGtQ==}
     engines: {node: '>= 0.4'}
 
+  obuf@1.1.2:
+    resolution: {integrity: sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg==}
+
   on-finished@2.3.0:
     resolution: {integrity: sha512-ikqdkGAAyf/X/gPhXGvfgAytDZtDbr+bkNUJ0N9h5MI/dmdgCs3l6hoHrcUv41sRKew3jIwrp4qQDXiK99Utww==}
     engines: {node: '>= 0.8'}
@@ -6202,24 +6255,62 @@ packages:
   pg-connection-string@2.6.4:
     resolution: {integrity: sha512-v+Z7W/0EO707aNMaAEfiGnGL9sxxumwLl2fJvCQtMn9Fxsg+lPpPkdcyBSv/KFgpGdYkMfn+EI1Or2EHjpgLCA==}
 
+  pg-connection-string@2.7.0:
+    resolution: {integrity: sha512-PI2W9mv53rXJQEOb8xNR8lH7Hr+EKa6oJa38zsK0S/ky2er16ios1wLKhZyxzD7jUReiWokc9WK5nxSnC7W1TA==}
+
+  pg-cursor@2.12.1:
+    resolution: {integrity: sha512-V13tEaA9Oq1w+V6Q3UBIB/blxJrwbbr35/dY54r/86soBJ7xkP236bXaORUTVXUPt9B6Ql2BQu+uwQiuMfRVgg==}
+    peerDependencies:
+      pg: ^8
+
   pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
     engines: {node: '>=4.0.0'}
+
+  pg-numeric@1.0.2:
+    resolution: {integrity: sha512-BM/Thnrw5jm2kKLE5uJkXqqExRUY/toLHda65XgFTBTFYZyopbKjBe29Ii3RbkvlsMoFwD+tHeGaCjjv0gHlyw==}
+    engines: {node: '>=4'}
 
   pg-pool@3.6.2:
     resolution: {integrity: sha512-Htjbg8BlwXqSBQ9V8Vjtc+vzf/6fVUuak/3/XXKA9oxZprwW3IMDQTGHP+KDmVL7rtd+R1QjbnCFPuTHm3G4hg==}
     peerDependencies:
       pg: '>=8.0'
 
+  pg-pool@3.7.0:
+    resolution: {integrity: sha512-ZOBQForurqh4zZWjrgSwwAtzJ7QiRX0ovFkZr2klsen3Nm0aoh33Ls0fzfv3imeH/nw/O27cjdz5kzYJfeGp/g==}
+    peerDependencies:
+      pg: '>=8.0'
+
   pg-protocol@1.6.1:
     resolution: {integrity: sha512-jPIlvgoD63hrEuihvIg+tJhoGjUsLPn6poJY9N5CnlPd91c2T18T/9zBtLxZSb1EhYxBRoZJtzScCaWlYLtktg==}
+
+  pg-protocol@1.7.0:
+    resolution: {integrity: sha512-hTK/mE36i8fDDhgDFjy6xNOG+LCorxLG3WO17tku+ij6sVHXh1jQUJ8hYAnRhNla4QVD2H8er/FOjc/+EgC6yQ==}
+
+  pg-query-stream@4.7.1:
+    resolution: {integrity: sha512-UMgsgn/pOIYsIifRySp59vwlpTpLADMK9HWJtq5ff0Z3MxBnPMGnCQeaQl5VuL+7ov4F96mSzIRIcz+Duo6OiQ==}
+    peerDependencies:
+      pg: ^8
 
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
 
+  pg-types@4.0.2:
+    resolution: {integrity: sha512-cRL3JpS3lKMGsKaWndugWQoLOCoP+Cic8oseVcbr0qhPzYD5DWXK+RZ9LY9wxRf7RQia4SCwQlXk0q6FCPrVng==}
+    engines: {node: '>=10'}
+
   pg@8.12.0:
     resolution: {integrity: sha512-A+LHUSnwnxrnL/tZ+OLfqR1SxLN3c/pgDztZ47Rpbsd4jUytsTtwQo/TLPRzPJMp/1pbhYVhH9cuSZLAajNfjQ==}
+    engines: {node: '>= 8.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pg@8.13.1:
+    resolution: {integrity: sha512-OUir1A0rPNZlX//c7ksiu7crsGZTKSOXJPgtNiHGIlC9H0lO+NC6ZDYksSgBYY/thSWhnSRBv8w1lieNNGATNQ==}
     engines: {node: '>= 8.0.0'}
     peerDependencies:
       pg-native: '>=3.0.1'
@@ -6284,17 +6375,40 @@ packages:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
 
+  postgres-array@3.0.2:
+    resolution: {integrity: sha512-6faShkdFugNQCLwucjPcY5ARoW1SlbnrZjmGl0IrrqewpvxvhSLHimCVzqeuULCbG0fQv7Dtk1yDbG3xv7Veog==}
+    engines: {node: '>=12'}
+
   postgres-bytea@1.0.0:
     resolution: {integrity: sha512-xy3pmLuQqRBZBXDULy7KbaitYqLcmxigw14Q5sj8QBVLqEwXfeybIKVWiqAXTlcvdvb0+xkOtDbfQMOf4lST1w==}
     engines: {node: '>=0.10.0'}
+
+  postgres-bytea@3.0.0:
+    resolution: {integrity: sha512-CNd4jim9RFPkObHSjVHlVrxoVQXz7quwNFpz7RY1okNNme49+sVyiTvTRobiLV548Hx/hb1BG+iE7h9493WzFw==}
+    engines: {node: '>= 6'}
 
   postgres-date@1.0.7:
     resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
     engines: {node: '>=0.10.0'}
 
+  postgres-date@2.1.0:
+    resolution: {integrity: sha512-K7Juri8gtgXVcDfZttFKVmhglp7epKb1K4pgrkLxehjqkrgPhfG6OO8LHLkfaqkbpjNRnra018XwAr1yQFWGcA==}
+    engines: {node: '>=12'}
+
   postgres-interval@1.2.0:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
+
+  postgres-interval@3.0.0:
+    resolution: {integrity: sha512-BSNDnbyZCXSxgA+1f5UU2GmwhoI0aU5yMxRGO8CdFEcY2BQF9xm/7MqKnYoM1nJDk8nONNWDk9WeSmePFhQdlw==}
+    engines: {node: '>=12'}
+
+  postgres-interval@4.0.2:
+    resolution: {integrity: sha512-EMsphSQ1YkQqKZL2cuG0zHkmjCCzQqQ71l2GXITqRwjhRleCdv00bDk/ktaSi0LnlaPzAc3535KTrjXsTdtx7A==}
+    engines: {node: '>=12'}
+
+  postgres-range@1.1.4:
+    resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
   prelude-ls@1.1.2:
     resolution: {integrity: sha512-ESF23V4SKG6lVSGZgYNpbsiaAkdab6ZgOxe52p7+Kid3W3u3bxR4Vfd/o21dmN7jSt0IwgZ4v5MUd26FEtXE9w==}
@@ -6674,6 +6788,10 @@ packages:
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
 
+  roarr@7.21.1:
+    resolution: {integrity: sha512-3niqt5bXFY1InKU8HKWqqYTYjtrBaxBMnXELXCXUYgtNYGUtZM5rB46HIC430AyacL95iEniGf7RgqsesykLmQ==}
+    engines: {node: '>=18.0'}
+
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
 
@@ -6707,6 +6825,9 @@ packages:
   schema-utils@3.3.0:
     resolution: {integrity: sha512-pN/yOAvcC+5rQ5nERGuwrjLlYvLTbCibnZ1I7B1LaiAz9BRBlE9GMgE/eqV30P7aJQUf7Ddimy/RsbYO/GrVGg==}
     engines: {node: '>= 10.13.0'}
+
+  semver-compare@1.0.0:
+    resolution: {integrity: sha512-YM3/ITh2MJ5MtzaM429anh+x2jiLVjqILF4m4oyQB18W7Ggea7BfqdH/wGMK7dDiMghv/6WG7znWMwUDzJiXow==}
 
   semver-greatest-satisfied-range@1.1.0:
     resolution: {integrity: sha512-Ny/iyOzSSa8M5ML46IAx3iXc6tfOsYU2R4AXi2UpHk60Zrgyq6eqPj/xiOfS0rRl/iiQ/rdJkVjw/5cdUyCntQ==}
@@ -6769,6 +6890,10 @@ packages:
         optional: true
       tedious:
         optional: true
+
+  serialize-error@8.1.0:
+    resolution: {integrity: sha512-3NnuWfM6vBYoy5gZFvHiYsVbafvI9vZv/+jlIigFn4oP4zjNPK3LhcY0xSCgeb1a5L8jO71Mit9LlNoi2UfDDQ==}
+    engines: {node: '>=10'}
 
   serialize-javascript@6.0.2:
     resolution: {integrity: sha512-Saa1xPByTTq2gdeFZYLLo+RFE35NHZkAbqZeWNd3BpzppeVisAqpDjcp8dyf6uIvEqJRd46jemmyA4iFIeVk8g==}
@@ -6872,6 +6997,12 @@ packages:
   slice-ansi@5.0.0:
     resolution: {integrity: sha512-FC+lgizVPfie0kkhqUScwRu1O/lF6NOgJmlCgK+/LYxDCTk8sGelYaHDhFcDN+Sn3Cv+3VSa4Byeo+IMCzpMgQ==}
     engines: {node: '>=12'}
+
+  slonik@46.2.0:
+    resolution: {integrity: sha512-tgTk4X84ZBY6h3uBEGYtVO2zvu5FN89XIjCq7erlq8ZbPMFwXxBv29OxgoE59OGnyuVEashY2QNzfqEGpfDMmg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3
 
   snapdragon-node@2.1.1:
     resolution: {integrity: sha512-O27l4xaMYt/RSQ5TR3vpWCAB5Kb/czIcqUFOM/C4fYcLnbZUc1PkjTAMjof2pBWaSTwOUd6qUHcFGVGj7aIwnw==}
@@ -6977,6 +7108,10 @@ packages:
     resolution: {integrity: sha512-XlkWvfIm6RmsWtNJx+uqtKLS8eqFbxUg0ZzLXqY0caEy9l7hruX8IpiDnjsLavoBgqCCR71TqWO8MaXYheJ3RQ==}
     engines: {node: '>=10'}
 
+  stacktrace-parser@0.1.10:
+    resolution: {integrity: sha512-KJP1OCML99+8fhOHxwwzyWrlUuVX5GQ0ZpJTd1DFXhdkrvg1szxfHhawXUZ3g9TkXORQd4/WG68jMlQZ2p8wlg==}
+    engines: {node: '>=6'}
+
   static-extend@0.1.2:
     resolution: {integrity: sha512-72E9+uLc27Mt718pMHt9VMNiAL4LMsmDbBva8mxWUCkT07fSzEGMYUCk0XWY6lp0j6RBAG4cJ3mWuZv2OE3s0g==}
     engines: {node: '>=0.10.0'}
@@ -7018,6 +7153,9 @@ packages:
   streamsearch@1.1.0:
     resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
     engines: {node: '>=10.0.0'}
+
+  strict-event-emitter-types@2.0.0:
+    resolution: {integrity: sha512-Nk/brWYpD85WlOgzw5h173aci0Teyv8YdIAEtV+N88nDB0dLlazZyJMIsN6eo1/AR61l+p6CJTG1JIyFaoNEEA==}
 
   string-argv@0.3.2:
     resolution: {integrity: sha512-aqD2Q0144Z+/RqG52NeHEkZauTAUWJO8c6yTftGJKO3Tja5tUgIfmIl6kExvhtxSDP7fXB6DvzkfMpCd/F3G+Q==}
@@ -7438,6 +7576,10 @@ packages:
 
   type-fest@0.6.0:
     resolution: {integrity: sha512-q+MB8nYR1KDLrgr4G5yemftpMC7/QLqVndBmEEdqzmNj5dcFOO4Oo8qlwZE3ULT3+Zim1F8Kq4cBnikNhlCMlg==}
+    engines: {node: '>=8'}
+
+  type-fest@0.7.1:
+    resolution: {integrity: sha512-Ne2YiiGN8bmrmJJEuTWTLJR32nh/JdL1+PSicowtNb0WFpn59GK8/lfD61bVtzguz7b3PBt74nxpv/Pw5po5Rg==}
     engines: {node: '>=8'}
 
   type-fest@0.8.1:
@@ -7990,6 +8132,9 @@ packages:
 
   zen-observable@0.8.15:
     resolution: {integrity: sha512-PQ2PC7R9rslx84ndNBZB/Dkv8V8fZEpk83RLgXtYd0fwUgEjseMn1Dgajh2x6S8QbZAFa9p2qVCEuYZNgve0dQ==}
+
+  zod@3.24.1:
+    resolution: {integrity: sha512-muH7gBL9sI1nciMZV67X5fTKKBLtwpZ5VBp1vsOQzj1MhrBZ4wlVCm3gedKZWLp0Oyel8sIGfeiz54Su+OVT+A==}
 
 snapshots:
 
@@ -9149,6 +9294,54 @@ snapshots:
       type-detect: 4.1.0
 
   '@sinonjs/text-encoding@0.7.3': {}
+
+  '@slonik/driver@46.2.0(zod@3.24.1)':
+    dependencies:
+      '@slonik/types': 46.2.0(zod@3.24.1)
+      '@slonik/utilities': 46.2.0(zod@3.24.1)
+      roarr: 7.21.1
+      serialize-error: 8.1.0
+      strict-event-emitter-types: 2.0.0
+      zod: 3.24.1
+
+  '@slonik/errors@46.2.0(zod@3.24.1)':
+    dependencies:
+      '@slonik/types': 46.2.0(zod@3.24.1)
+      zod: 3.24.1
+
+  '@slonik/pg-driver@46.2.0(zod@3.24.1)':
+    dependencies:
+      '@slonik/driver': 46.2.0(zod@3.24.1)
+      '@slonik/errors': 46.2.0(zod@3.24.1)
+      '@slonik/sql-tag': 46.2.0(zod@3.24.1)
+      '@slonik/types': 46.2.0(zod@3.24.1)
+      '@slonik/utilities': 46.2.0(zod@3.24.1)
+      pg: 8.13.1
+      pg-query-stream: 4.7.1(pg@8.13.1)
+      pg-types: 4.0.2
+      postgres-array: 3.0.2
+      zod: 3.24.1
+    transitivePeerDependencies:
+      - pg-native
+
+  '@slonik/sql-tag@46.2.0(zod@3.24.1)':
+    dependencies:
+      '@slonik/errors': 46.2.0(zod@3.24.1)
+      '@slonik/types': 46.2.0(zod@3.24.1)
+      roarr: 7.21.1
+      safe-stable-stringify: 2.4.3
+      serialize-error: 8.1.0
+      zod: 3.24.1
+
+  '@slonik/types@46.2.0(zod@3.24.1)':
+    dependencies:
+      zod: 3.24.1
+
+  '@slonik/utilities@46.2.0(zod@3.24.1)':
+    dependencies:
+      '@slonik/types': 46.2.0(zod@3.24.1)
+      roarr: 7.21.1
+      zod: 3.24.1
 
   '@socket.io/component-emitter@3.1.2': {}
 
@@ -11796,6 +11989,8 @@ snapshots:
 
   fast-levenshtein@2.0.6: {}
 
+  fast-printf@1.6.10: {}
+
   fast-querystring@1.1.2:
     dependencies:
       fast-decode-uri-component: 1.0.1
@@ -12068,6 +12263,10 @@ snapshots:
       hasown: 2.0.2
 
   get-package-type@0.1.0: {}
+
+  get-stack-trace@3.1.1:
+    dependencies:
+      stacktrace-parser: 0.1.10
 
   get-stream@6.0.1: {}
 
@@ -12728,6 +12927,8 @@ snapshots:
   isbinaryfile@4.0.10: {}
 
   isexe@2.0.0: {}
+
+  iso8601-duration@1.3.0: {}
 
   isobject@2.1.0:
     dependencies:
@@ -14056,6 +14257,8 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.0.0
 
+  obuf@1.1.2: {}
+
   on-finished@2.3.0:
     dependencies:
       ee-first: 1.1.1
@@ -14259,13 +14462,32 @@ snapshots:
 
   pg-connection-string@2.6.4: {}
 
+  pg-connection-string@2.7.0: {}
+
+  pg-cursor@2.12.1(pg@8.13.1):
+    dependencies:
+      pg: 8.13.1
+
   pg-int8@1.0.1: {}
+
+  pg-numeric@1.0.2: {}
 
   pg-pool@3.6.2(pg@8.12.0):
     dependencies:
       pg: 8.12.0
 
+  pg-pool@3.7.0(pg@8.13.1):
+    dependencies:
+      pg: 8.13.1
+
   pg-protocol@1.6.1: {}
+
+  pg-protocol@1.7.0: {}
+
+  pg-query-stream@4.7.1(pg@8.13.1):
+    dependencies:
+      pg: 8.13.1
+      pg-cursor: 2.12.1(pg@8.13.1)
 
   pg-types@2.2.0:
     dependencies:
@@ -14275,11 +14497,31 @@ snapshots:
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
 
+  pg-types@4.0.2:
+    dependencies:
+      pg-int8: 1.0.1
+      pg-numeric: 1.0.2
+      postgres-array: 3.0.2
+      postgres-bytea: 3.0.0
+      postgres-date: 2.1.0
+      postgres-interval: 3.0.0
+      postgres-range: 1.1.4
+
   pg@8.12.0:
     dependencies:
       pg-connection-string: 2.6.4
       pg-pool: 3.6.2(pg@8.12.0)
       pg-protocol: 1.6.1
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.1.1
+
+  pg@8.13.1:
+    dependencies:
+      pg-connection-string: 2.7.0
+      pg-pool: 3.7.0(pg@8.13.1)
+      pg-protocol: 1.7.0
       pg-types: 2.2.0
       pgpass: 1.0.5
     optionalDependencies:
@@ -14323,13 +14565,27 @@ snapshots:
 
   postgres-array@2.0.0: {}
 
+  postgres-array@3.0.2: {}
+
   postgres-bytea@1.0.0: {}
 
+  postgres-bytea@3.0.0:
+    dependencies:
+      obuf: 1.1.2
+
   postgres-date@1.0.7: {}
+
+  postgres-date@2.1.0: {}
 
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+
+  postgres-interval@3.0.0: {}
+
+  postgres-interval@4.0.2: {}
+
+  postgres-range@1.1.4: {}
 
   prelude-ls@1.1.2: {}
 
@@ -14763,6 +15019,12 @@ snapshots:
       hash-base: 3.1.0
       inherits: 2.0.4
 
+  roarr@7.21.1:
+    dependencies:
+      fast-printf: 1.6.10
+      safe-stable-stringify: 2.4.3
+      semver-compare: 1.0.0
+
   run-parallel@1.2.0:
     dependencies:
       queue-microtask: 1.2.3
@@ -14801,6 +15063,8 @@ snapshots:
       '@types/json-schema': 7.0.15
       ajv: 6.12.6
       ajv-keywords: 3.5.2(ajv@6.12.6)
+
+  semver-compare@1.0.0: {}
 
   semver-greatest-satisfied-range@1.1.0:
     dependencies:
@@ -14872,6 +15136,10 @@ snapshots:
       pg: 8.12.0
     transitivePeerDependencies:
       - supports-color
+
+  serialize-error@8.1.0:
+    dependencies:
+      type-fest: 0.20.2
 
   serialize-javascript@6.0.2:
     dependencies:
@@ -15006,6 +15274,23 @@ snapshots:
     dependencies:
       ansi-styles: 6.2.1
       is-fullwidth-code-point: 4.0.0
+
+  slonik@46.2.0(zod@3.24.1):
+    dependencies:
+      '@slonik/driver': 46.2.0(zod@3.24.1)
+      '@slonik/errors': 46.2.0(zod@3.24.1)
+      '@slonik/pg-driver': 46.2.0(zod@3.24.1)
+      '@slonik/sql-tag': 46.2.0(zod@3.24.1)
+      '@slonik/utilities': 46.2.0(zod@3.24.1)
+      get-stack-trace: 3.1.1
+      iso8601-duration: 1.3.0
+      postgres-interval: 4.0.2
+      roarr: 7.21.1
+      serialize-error: 8.1.0
+      strict-event-emitter-types: 2.0.0
+      zod: 3.24.1
+    transitivePeerDependencies:
+      - pg-native
 
   snapdragon-node@2.1.1:
     dependencies:
@@ -15148,6 +15433,10 @@ snapshots:
     dependencies:
       escape-string-regexp: 2.0.0
 
+  stacktrace-parser@0.1.10:
+    dependencies:
+      type-fest: 0.7.1
+
   static-extend@0.1.2:
     dependencies:
       define-property: 0.2.5
@@ -15196,6 +15485,8 @@ snapshots:
       - supports-color
 
   streamsearch@1.1.0: {}
+
+  strict-event-emitter-types@2.0.0: {}
 
   string-argv@0.3.2: {}
 
@@ -15669,6 +15960,8 @@ snapshots:
   type-fest@0.21.3: {}
 
   type-fest@0.6.0: {}
+
+  type-fest@0.7.1: {}
 
   type-fest@0.8.1: {}
 
@@ -16301,3 +16594,5 @@ snapshots:
   yocto-queue@1.1.1: {}
 
   zen-observable@0.8.15: {}
+
+  zod@3.24.1: {}

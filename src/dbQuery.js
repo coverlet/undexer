@@ -108,6 +108,7 @@ const BLOCK_LIST_ATTRIBUTES = [
   "blockHeight",
   "blockHash",
   "blockTime",
+  [db.json("blockHeader.proposerAddress"), "proposerConsensusKey"],
   "epoch",
 ];
 

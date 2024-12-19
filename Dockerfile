@@ -1,6 +1,5 @@
 # Build the WASM blob
 from oci.hack.bg/platform-alpine:latest as wasm
-  run apk add musl-dev protoc protobuf-dev openssl-dev cmake
   workdir /build/fadroma-namada
   copy ./fadroma/packages/namada/Cargo.toml ./fadroma/packages/namada/Cargo.lock .
   run cat Cargo.toml && mkdir -p src && touch src/lib.rs && PATH=$PATH:~/.cargo/bin cargo fetch

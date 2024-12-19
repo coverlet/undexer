@@ -52,11 +52,11 @@ rpcRoutes['/denomination/:token'] = chain => async function multiRpcTokenDenomin
 }
 
 rpcRoutes['/total-supply/:token'] = chain => async function multiRpcTokenDenomination (req) {
-  return { ...rpcResponseMeta(chain), ...await chain.fetchTotalSupply(req.params.token) }
+  return { ...rpcResponseMeta(chain), totalSupply: await chain.fetchTotalSupply(req.params.token) }
 }
 
 rpcRoutes['/effective-native-supply'] = chain => async function multiRpcTokenDenomination (req) {
-  return { ...rpcResponseMeta(chain), ...await chain.fetchEffectiveNativeSupply() }
+  return { ...rpcResponseMeta(chain), effectiveNativeSupply: await chain.fetchEffectiveNativeSupply() }
 }
 
 rpcRoutes['/staking-rewards-rate'] = chain => async function multiRpcTokenDenomination (req) {

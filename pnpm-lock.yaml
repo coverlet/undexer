@@ -141,7 +141,7 @@ importers:
         version: link:fixtures
       '@fadroma/namada':
         specifier: workspace:*
-        version: link:packages/namada
+        version: link:../lib
       '@fadroma/oci':
         specifier: workspace:^
         version: link:packages/oci
@@ -237,7 +237,7 @@ importers:
         version: link:../devnet
       '@fadroma/namada':
         specifier: workspace:*
-        version: link:../namada
+        version: link:../../../lib
       '@hackbg/cmds':
         specifier: workspace:*
         version: link:../../toolbox/cmds
@@ -1361,6 +1361,24 @@ importers:
       webpack-cli:
         specifier: 4.9.2
         version: 4.9.2(webpack@5.76.0)
+
+  lib:
+    dependencies:
+      '@fadroma/cw':
+        specifier: workspace:*
+        version: link:../fadroma/packages/cw
+      '@hackbg/4mat':
+        specifier: workspace:*
+        version: link:../fadroma/toolbox/4mat
+      '@hackbg/borshest':
+        specifier: workspace:*
+        version: link:../fadroma/toolbox/borshest
+      '@hackbg/cmds':
+        specifier: workspace:*
+        version: link:../fadroma/toolbox/cmds
+      '@hackbg/fadroma':
+        specifier: workspace:*
+        version: link:../fadroma
 
 packages:
 

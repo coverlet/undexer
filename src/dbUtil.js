@@ -1,4 +1,6 @@
 import db from './db.js'
+import { QueryTypes } from 'sequelize'
+const { SELECT, COUNT } = QueryTypes
 
 import { sql } from 'slonik'
 
@@ -12,6 +14,9 @@ export const count = query =>
 
 export const slonikCount = query =>
   toCount(slonikQuery(query))
+
+export const slonikSelect = async (query, options = {}) =>
+  (await slonikQuery(query, { ...options, type: SELECT }))[0]
 
 export const slonikQuery = (query, options = {}) => {
   const { sql, values } = query

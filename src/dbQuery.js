@@ -367,7 +367,7 @@ export const bondOrUnboundCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}`)
 export const bondOrUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
-  slonikQuery(sql.unsafe`SELECT *
+  slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
 
@@ -375,7 +375,7 @@ export const bondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${bondFilter({ source, validator })}`)
 export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
-  slonikQuery(sql.unsafe`SELECT *
+  slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${bondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
 
@@ -383,7 +383,7 @@ export const unbondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${unbondFilter({ source, validator })}`)
 export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
-  slonikQuery(sql.unsafe`SELECT *
+  slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${unbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
 

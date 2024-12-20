@@ -31,6 +31,9 @@ export const DESC =
 export const paginate = (column, ordering, limit, offset) =>
   sql.fragment`ORDER BY ${sql.identifier([column])} ${ordering} LIMIT ${limit} OFFSET ${offset}`
 
+export const paginateByContent = (column, path, type, ordering, limit, offset) =>
+  sql.fragment`ORDER BY (${sql.identifier([column])} -> ${path})::${type} ${ordering} LIMIT ${limit} OFFSET ${offset}`
+
 export const txsByContent =
   sql.fragment`SELECT
     "blockHeight", "txHash", "txTime",

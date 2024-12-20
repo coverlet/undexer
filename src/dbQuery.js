@@ -11,7 +11,7 @@ import {
   fromTxsByContent,
   matchContentType,
   matchSourceOrValidator,
-  paginate, ASC, DESC
+  paginateByContent, ASC, DESC
 } from './dbUtil.js'
 
 const { SELECT, COUNT } = QueryTypes
@@ -361,7 +361,7 @@ export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
     SELECT * ${fromTxsByContent}
     WHERE ${matchContentType("tx_bond.wasm")}
     AND ${matchSourceOrValidator({ source, validator })}
-    ${paginate("blockHeight", DESC, limit, offset)}`, { type: SELECT })
+    ${paginateByContent("content", sql.fragment`'data'->>'amount'`, sql.fragment`bigint`, DESC, limit, offset)}`)
 export const unbondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`
     SELECT COUNT(*) ${fromTxsByContent}
@@ -372,7 +372,7 @@ export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
     SELECT * ${fromTxsByContent}
     WHERE ${matchContentType("tx_unbond.wasm")}
     AND ${matchSourceOrValidator({ source, validator })}
-    ${paginate("blockHeight", DESC, limit, offset)}`, { type: SELECT })
+    ${paginateByContent("content", sql.fragment`'data'->>'amount'`, sql.fragment`bigint`, DESC, limit, offset)}`)
 
 export const txWithAddressCount = async ({ address = "" }) => await count(`
   SELECT COUNT(*) FROM "transactions" WHERE (

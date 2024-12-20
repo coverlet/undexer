@@ -206,6 +206,19 @@ dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res
   return send200(res, { count, votes: rows });
 }
 
+dbRoutes['/bonds-and-unbonds'] = async function dbBonds (req, res) {
+  const { limit, offset } = pagination(req)
+  const { validator, delegator, source = delegator } = req?.query ?? {}
+  if (delegator && (source != delegator)) {
+    return send400(res, "Use source OR delegator (they are equivalent)")
+  }
+  const [count, bonds] = await Promise.all([
+    Query.bondAndUnboundCount({ source, validator }),
+    Query.bondAndUnboundList({ source, validator, limit, offset })
+  ])
+  return send200(res, { count, bonds })
+}
+
 dbRoutes['/bonds'] = async function dbBonds (req, res) {
   const { limit, offset } = pagination(req)
   const { validator, delegator, source = delegator } = req?.query ?? {}

@@ -7,7 +7,7 @@ import {
   sql,
   count,
   slonikCount,
-  slonikQuery,
+  slonikSelect,
   fromTxsByContent,
   matchContentType,
   matchSourceOrValidator,

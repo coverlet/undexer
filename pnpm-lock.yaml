@@ -162,7 +162,7 @@ importers:
         version: 'link:'
       '@hackbg/ganesha':
         specifier: '*'
-        version: 4.2.0(typescript@5.6.3)
+        version: 4.2.0(typescript@5.7.2)
       '@hackbg/ubik':
         specifier: workspace:^
         version: link:toolbox/ubik
@@ -195,10 +195,10 @@ importers:
         version: 13.3.0(enquirer@2.4.1)
       typedoc:
         specifier: 0.25.13
-        version: 0.25.13(typescript@5.6.3)
+        version: 0.25.13(typescript@5.7.2)
       typescript:
-        specifier: ^5.6.3
-        version: 5.6.3
+        specifier: ^5.7.2
+        version: 5.7.2
 
   fadroma/examples:
     dependencies:
@@ -444,10 +444,10 @@ importers:
         version: 13.3.0(enquirer@2.4.1)
       typedoc:
         specifier: ^0.25.4
-        version: 0.25.13(typescript@5.6.3)
+        version: 0.25.13(typescript@5.7.2)
       typescript:
-        specifier: ~5.6.3
-        version: 5.6.3
+        specifier: ~5.7.2
+        version: 5.7.2
 
   fadroma/toolbox/4mat:
     dependencies:
@@ -813,8 +813,8 @@ importers:
         specifier: ^8.0.1
         version: 8.0.1
       typescript:
-        specifier: ~5.6.3
-        version: 5.6.3
+        specifier: ~5.7.2
+        version: 5.7.2
 
   fadroma/vendored/cosmjs-esm:
     dependencies:
@@ -7395,11 +7395,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.6.3:
-    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
   typescript@5.7.2:
     resolution: {integrity: sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==}
     engines: {node: '>=14.17'}
@@ -8500,18 +8495,6 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@ganesha/node-legacy@4.0.2(typescript@5.6.3)':
-    dependencies:
-      '@ganesha/core': 3.0.1
-      '@ganesha/ts': 2.0.1(typescript@5.6.3)
-      front-matter: 4.0.2
-      joycon: 3.1.1
-      jsonc-parser: 3.3.1
-      pirates: 4.0.6
-      source-map-support: 0.5.21
-    transitivePeerDependencies:
-      - typescript
-
   '@ganesha/node-legacy@4.0.2(typescript@5.7.2)':
     dependencies:
       '@ganesha/core': 3.0.1
@@ -8534,16 +8517,6 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@ganesha/node@3.2.0(typescript@5.6.3)':
-    dependencies:
-      '@ganesha/core': 3.0.1
-      '@ganesha/ts': 2.0.1(typescript@5.6.3)
-      front-matter: 4.0.2
-      jsonc-parser: 3.3.1
-      source-map-support: 0.5.21
-    transitivePeerDependencies:
-      - typescript
-
   '@ganesha/node@3.2.0(typescript@5.7.2)':
     dependencies:
       '@ganesha/core': 3.0.1
@@ -8560,13 +8533,6 @@ snapshots:
       joycon: 3.1.1
       jsonc-parser: 3.3.1
       typescript: 5.3.3
-
-  '@ganesha/ts@2.0.1(typescript@5.6.3)':
-    dependencies:
-      '@ganesha/core': 3.0.1
-      joycon: 3.1.1
-      jsonc-parser: 3.3.1
-      typescript: 5.6.3
 
   '@ganesha/ts@2.0.1(typescript@5.7.2)':
     dependencies:
@@ -8651,17 +8617,6 @@ snapshots:
       pkg-up: 4.0.0
     optionalDependencies:
       typescript: 5.3.3
-
-  '@hackbg/ganesha@4.2.0(typescript@5.6.3)':
-    dependencies:
-      '@ganesha/core': 3.0.1
-      '@ganesha/node': 3.2.0(typescript@5.6.3)
-      '@ganesha/node-legacy': 4.0.2(typescript@5.6.3)
-      '@ganesha/ts': 2.0.1(typescript@5.6.3)
-      cross-spawn: 7.0.3
-      pkg-up: 4.0.0
-    optionalDependencies:
-      typescript: 5.6.3
 
   '@hackbg/ganesha@4.2.0(typescript@5.7.2)':
     dependencies:
@@ -15513,14 +15468,6 @@ snapshots:
       shiki: 0.10.1
       typescript: 5.3.3
 
-  typedoc@0.25.13(typescript@5.6.3):
-    dependencies:
-      lunr: 2.3.9
-      marked: 4.3.0
-      minimatch: 9.0.5
-      shiki: 0.14.7
-      typescript: 5.6.3
-
   typedoc@0.25.13(typescript@5.7.2):
     dependencies:
       lunr: 2.3.9
@@ -15539,8 +15486,6 @@ snapshots:
       yaml: 2.6.1
 
   typescript@5.3.3: {}
-
-  typescript@5.6.3: {}
 
   typescript@5.7.2: {}
 

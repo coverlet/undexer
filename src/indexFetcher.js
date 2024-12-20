@@ -1,5 +1,6 @@
 import { Console } from '@fadroma/namada'
 import { Logged, retryForever, runParallel } from './utils.js'
+import * as DB from './db.js'
 
 const console = new Console('')
 
@@ -119,11 +120,17 @@ export class Fetcher extends Logged {
 
   async fetchAllActiveProposalsWithVotes (epoch) {
     const count = await this.fetchProposalCount(epoch)
+    const idsWithoutResults = new Set(await DB.proposalsWithoutResults())
     const ids = []
     for (let id = 0; id < count; id++) {
       const result = await this.fetchProposalResult(id, epoch)
       if (result) {
-        this.logE(epoch, 'Proposal', id, 'has stored result, not updating')
+        if (idsWithoutResults.has(id)) {
+          this.logE(epoch, 'Proposal', id, 'has new result, storing')
+          ids.push(id)
+        } else {
+          this.logE(epoch, 'Proposal', id, 'already has stored result, not updating')
+        }
       } else {
         ids.push(id)
       }

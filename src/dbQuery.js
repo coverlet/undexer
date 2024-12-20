@@ -11,7 +11,10 @@ import {
   fromTxsByContent,
   matchContentType,
   matchSourceOrValidator,
-  paginateByContent, ASC, DESC, OR
+  paginateByContent,
+  defaultAttributes,
+  ASC, DESC,
+  OR
 } from './dbUtil.js'
 
 const { SELECT, COUNT } = QueryTypes
@@ -393,6 +396,10 @@ export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
     ${fromTxsByContent} ${unbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
 
+export const proposalsWithoutResults = () =>
+  slonikSelect(sql.unsafe`SELECT id FROM proposals WHERE result is null`)
+    .then(rows=>rows.map(row=>row.id))
+
 export const txWithAddressCount = async ({ address = "" }) => await count(`
   SELECT COUNT(*) FROM "transactions" WHERE (
     (
@@ -577,17 +584,4 @@ export const validatorNamadaAddressToConsensusAddresses = async (namadaAddress) 
     }
   }
   return addresses
-}
-
-export const defaultAttributes = (args = {}) => {
-  const attrs = { exclude: ['createdAt', 'updatedAt'] }
-  if (args instanceof Array) {
-    attrs.include = args
-  } else if (args instanceof Object) {
-    if (args.include) attrs.include = [...new Set([...attrs.include||[], ...args.include])]
-    if (args.exclude) attrs.exclude = [...new Set([...attrs.exclude||[], ...args.exclude])]
-  } else {
-    throw new Error('defaultAttributes takes Array or Object')
-  }
-  return attrs
 }

@@ -357,9 +357,11 @@ const bondUnbondPagination = ({ limit, offset }) => paginateByContent(
 const bondOrUnbondFilter = ({ source, validator }) => sql.fragment`
   WHERE ${OR(matchContentType("tx_bond.wasm"), matchContentType("tx_unbond.wasm"))}
     AND ${matchSourceOrValidator({ source, validator })}`
+
 export const bondAndUnboundCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}`)
+
 export const bondAndUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}
@@ -368,9 +370,11 @@ export const bondAndUnboundList = ({ source, validator, limit = 100, offset = 0 
 const bondFilter = ({ source, validator }) => sql.fragment`
   WHERE ${matchContentType("tx_bond.wasm")}
     AND ${matchSourceOrValidator({ source, validator })}`
+
 export const bondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${bondFilter({ source, validator })}`)
+
 export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${bondFilter({ source, validator })}
@@ -379,9 +383,11 @@ export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
 const unbondFilter = ({ source, validator }) => sql.fragment`
   WHERE ${matchContentType("tx_unbond.wasm")}
     AND ${matchSourceOrValidator({ source, validator })}`
+
 export const unbondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${unbondFilter({ source, validator })}`)
+
 export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${unbondFilter({ source, validator })}

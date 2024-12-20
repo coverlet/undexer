@@ -8,7 +8,7 @@ from oci.hack.bg/platform-alpine:latest as wasm
    && rm -rf target
 
 # Build the app container
-from oci.hack.bg/runtime-alpine:latest
+from oci.hack.bg/runtime-alpine:latest as prod
   workdir /app
   add . ./
   run pwd && ls -al

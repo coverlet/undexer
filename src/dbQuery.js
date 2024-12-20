@@ -363,10 +363,10 @@ const unbondFilter = ({ source, validator }) => sql.fragment`
 const bondUnbondPagination = ({ limit, offset }) => paginateByContent(
   "content", sql.fragment`'data'->>'amount'`, sql.fragment`bigint`, DESC, limit, offset)
 
-export const bondOrUnboundCount = ({ source = "", validator = "" }) =>
+export const bondAndUnboundCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}`)
-export const bondOrUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
+export const bondAndUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
     ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)

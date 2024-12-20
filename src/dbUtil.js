@@ -15,8 +15,8 @@ export const count = query =>
 export const slonikCount = query =>
   toCount(slonikQuery(query))
 
-export const slonikSelect = async (query, options = {}) =>
-  (await slonikQuery(query, { ...options, type: SELECT }))[0]
+export const slonikSelect = (query, options = {}) =>
+  slonikQuery(query, { ...options, type: SELECT })
 
 export const slonikQuery = (query, options = {}) => {
   const { sql, values } = query

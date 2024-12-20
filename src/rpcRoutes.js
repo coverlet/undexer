@@ -47,6 +47,22 @@ rpcRoutes['/parameters/pgf'] = chain => async function multiRpcPGFParameters (_)
   return { ...rpcResponseMeta(chain), ...await chain.fetchPGFParameters() }
 }
 
+rpcRoutes['/denomination/:token'] = chain => async function multiRpcTokenDenomination (req) {
+  return { ...rpcResponseMeta(chain), ...await chain.fetchDenomination(req.params.token) }
+}
+
+rpcRoutes['/total-supply/:token'] = chain => async function multiRpcTokenDenomination (req) {
+  return { ...rpcResponseMeta(chain), totalSupply: await chain.fetchTotalSupply(req.params.token) }
+}
+
+rpcRoutes['/effective-native-supply'] = chain => async function multiRpcTokenDenomination (req) {
+  return { ...rpcResponseMeta(chain), effectiveNativeSupply: await chain.fetchEffectiveNativeSupply() }
+}
+
+rpcRoutes['/staking-rewards-rate'] = chain => async function multiRpcTokenDenomination (req) {
+  return { ...rpcResponseMeta(chain), ...await chain.fetchStakingRewardsRate() }
+}
+
 rpcRoutes['/balances/:address'] = chain => async function dbBalances (req, _) {
   if (!req?.params?.address) {
     throw new Error('Missing URL parameter: address', { code: 400 });

@@ -4,12 +4,13 @@
   "main": "main.ts",
   "version": "4.0.0",
   "description": "Namada indexer to file.",
-  "packageManager": "pnpm@8.15.6+sha256.01c01eeb990e379b31ef19c03e9d06a14afa5250b82e81303f88721c99ff2e6f",
+  "packageManager": "pnpm@10.0.0-rc.0+sha512.bce495587126f9a37d64150bf80dcf9bd96f0d64cfd450c9b1a7e5bf2cfc81aef3d50178f259855351c872905a240861a55031652c81e8a11665bfa65f6a1dc2",
   "bin": {
     "undexer": "./undexer"
   },
   "scripts": {
-    "start": "concurrently --raw bin/api.js bin/indexer.js",
+    "start:api": "node --import=@ganesha/esbuild bin/api.js",
+    "start:indexer": "node --import=@ganesha/esbuild bin/indexer.js",
     "cli": "node undexer",
     "build:wasm:dev": "cd fadroma/packages/namada && pnpm build:wasm:dev",
     "build:wasm:prod": "cd fadroma/packages/namada && pnpm build:wasm:prod",
@@ -30,6 +31,7 @@
     "express": "^4.19.2",
     "mkdirp": "^3.0.1",
     "pg": "^8.12.0",
+    "slonik": "^46.2.0",
     "sequelize": "^6.37.3",
     "undici": "^6.19.2"
   },
@@ -37,7 +39,6 @@
     "@hackbg/port": "workspace:./fadroma/toolbox/port",
     "@types/node": "^22.7.0",
     "c8": "^10.1.2",
-    "concurrently": "7.2.2",
     "pgmock": "^1.0.3",
     "tsx": "^4.15.6"
   }

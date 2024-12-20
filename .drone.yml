@@ -3,35 +3,30 @@ kind: pipeline
 type: docker
 name: build
 trigger: { event: [ push ] }
-volumes: [ { name: cache, host: { path: /data/ci-cache-docker } } ]
+volumes: [ { name: docker, host: { path: "/data/ci-cache-docker" } } ]
+image_pull_secrets: [ oci_hack_bg ] # https://docs.drone.io/pipeline/docker/syntax/images/#pulling-private-images
 steps:
-- name: git
-  image: alpine/git:latest
+
+- name: prepare
+  image: oci.hack.bg/platform-alpine:latest
+  pull: always
   commands:
   - echo $HOME
   - ls -al $HOME
-  - printf $(git rev-parse --abbrev-ref HEAD) > BRANCH
-  - cat BRANCH
+  - git config --global --add safe.directory /drone/src
+  - printf $(git rev-parse --abbrev-ref HEAD) > "$HOME/BRANCH"
+  - cat "$HOME/BRANCH"
   - git submodule update --init --recursive --depth 1
-- name: build
-  image: docker:24.0.7-alpine3.18
-  volumes: [ { name: cache, path: /cache/docker } ]
+
+- name: docker
+  image: oci.hack.bg/drone-docker:master
+  pull: always
+  volumes: [ { name: docker, path: "/var/lib/docker" } ]
   privileged: true
-  environment:
-    NAME: "oci.hack.bg/undexer"
-    USER: { from_secret: "oci-user" }
-    PASS: { from_secret: "oci-pass" }
-    MIRROR: "http://127.0.0.1:5000"
-    DOCKER_DATA: "/cache/docker"
-    DOCKER_HOST: "tcp://127.0.0.1:2375"
-  commands:
-  - nohup dockerd --tls=false --dns 1.1.1.1 --rootless=true --bridge=none --iptables=false --data-root "$DOCKER_DATA" --host="$DOCKER_HOST" --registry-mirror "$MIRROR" &
-  - sleep 10
-  - docker version; docker info
-  - echo "\nLooking around...\n"; whoami; pwd; ls -al
-  - echo "$PASS" | docker login -u "$USER" --password-stdin https://oci.hack.bg
-  - export IMAGE="$NAME:$(cat BRANCH | tr '/' '_' | tr '\n' ' ')"
-  - 'printf "Name: $NAME\nImage: $IMAGE\n"'
-  - docker pull "$IMAGE" || true
-  - docker build --network=host --cache-to=type=inline --cache-from="$IMAGE" -t "$IMAGE" .
-  - docker push "$IMAGE"
+  settings:
+    #debug:    true
+    username: { from_secret: oci-user }
+    password: { from_secret: oci-pass }
+    registry: oci.hack.bg
+    repo:     oci.hack.bg/undexer
+    tags:     v4

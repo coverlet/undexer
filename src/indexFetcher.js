@@ -1,6 +1,7 @@
 import { Console } from '@fadroma/namada'
 import { Logged, retryForever, runParallel } from './utils.js'
 import * as DB from './db.js'
+import * as Query from './dbQuery.js'
 
 const console = new Console('')
 
@@ -120,7 +121,7 @@ export class Fetcher extends Logged {
 
   async fetchAllActiveProposalsWithVotes (epoch) {
     const count = await this.fetchProposalCount(epoch)
-    const idsWithoutResults = new Set(await DB.proposalsWithoutResults())
+    const idsWithoutResults = new Set(await Query.proposalsWithoutResults())
     const ids = []
     for (let id = 0; id < count; id++) {
       const result = await this.fetchProposalResult(id, epoch)

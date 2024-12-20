@@ -13,7 +13,7 @@ from oci.hack.bg/runtime-alpine:latest
   add . ./
   run pwd && ls -al
   user 0
-  run corepack install && pnpm --version && pnpm i -P
+  run corepack install && pnpm --version && corepack up && pnpm --version && pnpm i -P
   copy --from=wasm /build/fadroma-namada/pkg/fadroma_namada_bg.wasm ./fadroma/packages/namada/pkg/fadroma_namada_bg.wasm
   user 1000
   run pwd && ls -al

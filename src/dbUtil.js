@@ -1,8 +1,23 @@
 import db from './db.js'
+import { QueryTypes } from 'sequelize'
+const { SELECT, COUNT } = QueryTypes
 
 import { sql } from 'slonik'
 
 export { sql }
+
+export const defaultAttributes = (args = {}) => {
+  const attrs = { exclude: ['createdAt', 'updatedAt'] }
+  if (args instanceof Array) {
+    attrs.include = args
+  } else if (args instanceof Object) {
+    if (args.include) attrs.include = [...new Set([...attrs.include||[], ...args.include])]
+    if (args.exclude) attrs.exclude = [...new Set([...attrs.exclude||[], ...args.exclude])]
+  } else {
+    throw new Error('defaultAttributes takes Array or Object')
+  }
+  return attrs
+}
 
 export const toCount = query =>
   query.then(query=>Number(query[0][0].count))
@@ -12,6 +27,9 @@ export const count = query =>
 
 export const slonikCount = query =>
   toCount(slonikQuery(query))
+
+export const slonikSelect = (query, options = {}) =>
+  slonikQuery(query, { ...options, type: SELECT })
 
 export const slonikQuery = (query, options = {}) => {
   const { sql, values } = query
@@ -30,6 +48,9 @@ export const DESC =
 
 export const paginate = (column, ordering, limit, offset) =>
   sql.fragment`ORDER BY ${sql.identifier([column])} ${ordering} LIMIT ${limit} OFFSET ${offset}`
+
+export const paginateByContent = (column, path, type, ordering, limit, offset) =>
+  sql.fragment`ORDER BY (${sql.identifier([column])} -> ${path})::${type} ${ordering} LIMIT ${limit} OFFSET ${offset}`
 
 export const txsByContent =
   sql.fragment`SELECT

@@ -2,10 +2,13 @@ import express from 'express'
 import { literal, fn, cast, col } from 'sequelize';
 import * as DB from './db.js';
 import * as Query from './dbQuery.js';
+import { defaultAttributes } from './dbUtil.js';
 import { CHAIN_ID } from './config.js';
 import { Op } from "sequelize";
 import {
-  pagination, relativePagination, withConsole, send200, send400, send404, send500
+  withConsole,
+  pagination, relativePagination,
+  send200, send400, send404, send500
 } from './utils.js';
 
 const chainId = CHAIN_ID
@@ -57,7 +60,7 @@ dbRoutes['/blocks'] = async function dbBlocks (req, res) {
 
 dbRoutes['/block'] = async function dbBlock (req, res) {
   const timestamp = new Date().toISOString()
-  const _attrs = /*FIXME*/ Query.defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'blockData'])
+  const _attrs = /*FIXME*/ defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'blockData'])
   const { height, hash } = req.query
   const block = await Query.block({ height, hash })
   if (!block) {
@@ -115,7 +118,7 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
   if (!isNaN(epoch)) where['epoch'] = epoch
   if (state) where['state.state'] = state
   const order = [literal('"stake" collate "numeric" DESC')]
-  const attrs = Query.defaultAttributes({ exclude: ['id'] })
+  const attrs = defaultAttributes({ exclude: ['id'] })
   const { count, rows: validators } = await DB.Validator.findAndCountAll({
     where, order, limit, offset, attributes: attrs
   });
@@ -151,7 +154,7 @@ dbRoutes['/validator'] = async function dbValidatorByHash (req, res) {
   if (namadaAddress) where.namadaAddress = namadaAddress
   if (publicKey) where.publicKey = publicKey
   if (!isNaN(epoch)) where['epoch'] = epoch
-  const attrs = Query.defaultAttributes({ exclude: ['id'] })
+  const attrs = defaultAttributes({ exclude: ['id'] })
   let validator = await DB.Validator.findOne({ where, attributes: attrs });
   if (validator === null) {
     return send404(res, 'Validator not found')
@@ -202,11 +205,24 @@ dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res
   const where = { validator: req.params.address }
   if (!includeDelegated) where.isValidator = true
   const order = [['proposal', 'DESC']]
-  const attrs = Query.defaultAttributes();
+  const attrs = defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs, order
   });
   return send200(res, { count, votes: rows });
+}
+
+dbRoutes['/bonds-and-unbonds'] = async function dbBonds (req, res) {
+  const { limit, offset } = pagination(req)
+  const { validator, delegator, source = delegator } = req?.query ?? {}
+  if (delegator && (source != delegator)) {
+    return send400(res, "Use source OR delegator (they are equivalent)")
+  }
+  const [count, bonds] = await Promise.all([
+    Query.bondAndUnboundCount({ source, validator }),
+    Query.bondAndUnboundList({ source, validator, limit, offset })
+  ])
+  return send200(res, { count, bonds })
 }
 
 dbRoutes['/bonds'] = async function dbBonds (req, res) {
@@ -245,7 +261,7 @@ dbRoutes['/proposals'] = async function dbProposals (req, res) {
   if (status) where.status = status
   if (result) where.result = result
   const order = [[orderBy, orderDirection]]
-  const attrs = Query.defaultAttributes()
+  const attrs = defaultAttributes()
   const { rows, count } = await DB.Proposal.findAndCountAll({
     order, limit, offset, where, attributes: attrs
   });
@@ -292,7 +308,7 @@ dbRoutes['/proposal/:id'] = async function dbProposal(req, res) {
   })
   const votingResults = { totalYayPower, totalNayPower, totalAbstainPower, totalVotingPower }
 
-  const result = await DB.Proposal.findOne({ where: { id }, attributes: Query.defaultAttributes(), });
+  const result = await DB.Proposal.findOne({ where: { id }, attributes: defaultAttributes(), });
   return result ? send200(res, { ...(result.get()), votingResults }) : send404(res, 'Proposal not found');
 }
 
@@ -306,7 +322,7 @@ dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   if(voter) {
     where.delegator = voter
   }
-  const attrs = Query.defaultAttributes();
+  const attrs = defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs,
   });
@@ -325,7 +341,7 @@ dbRoutes['/proposal/votes/:id/validators'] = async function dbProposalVotes(req,
     where: { proposal }
   })
   const validatorVotes = await DB.Vote.findAll({
-    attributes: Query.defaultAttributes(), where: { isValidator: true, proposal }
+    attributes: defaultAttributes(), where: { isValidator: true, proposal }
   })
 
   const result = validators.map(({ validator }) => ({
@@ -355,7 +371,7 @@ dbRoutes['/proposal/votes/:id/validator/:address'] = async function dbProposalVo
   }
 
   const where = { proposal: req.params.id, validator: req.params.address };
-  const attributes = Query.defaultAttributes();
+  const attributes = defaultAttributes();
   const order = [literal('"power" collate "numeric" DESC')]
 
   const votes = await DB.Vote.findAll({

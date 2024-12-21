@@ -7,11 +7,14 @@ import {
   sql,
   count,
   slonikCount,
-  slonikQuery,
+  slonikSelect,
   fromTxsByContent,
   matchContentType,
   matchSourceOrValidator,
-  paginate, ASC, DESC
+  paginateByContent,
+  defaultAttributes,
+  ASC, DESC,
+  OR
 } from './dbUtil.js'
 
 const { SELECT, COUNT } = QueryTypes
@@ -351,28 +354,51 @@ export const deactivateValidatorList = async ({
   ORDER BY "blockHeight" DESC LIMIT :limit OFFSET :offset
 `, { type: SELECT, replacements: { address: JSON.stringify(address), limit, offset, } })
 
+const bondUnbondPagination = ({ limit, offset }) => paginateByContent(
+  "content", sql.fragment`'data'->>'amount'`, sql.fragment`bigint`, DESC, limit, offset)
+
+const bondOrUnbondFilter = ({ source, validator }) => sql.fragment`
+  WHERE ${OR(matchContentType("tx_bond.wasm"), matchContentType("tx_unbond.wasm"))}
+    AND ${matchSourceOrValidator({ source, validator })}`
+
+export const bondAndUnboundCount = ({ source = "", validator = "" }) =>
+  slonikCount(sql.unsafe`SELECT COUNT(*)
+    ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}`)
+
+export const bondAndUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
+  slonikSelect(sql.unsafe`SELECT *
+    ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}
+    ${bondUnbondPagination({ limit, offset })}`)
+
+const bondFilter = ({ source, validator }) => sql.fragment`
+  WHERE ${matchContentType("tx_bond.wasm")}
+    AND ${matchSourceOrValidator({ source, validator })}`
+
 export const bondCount = ({ source = "", validator = "" }) =>
-  slonikCount(sql.unsafe`
-    SELECT COUNT(*) ${fromTxsByContent}
-    WHERE ${matchContentType("tx_bond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}`)
+  slonikCount(sql.unsafe`SELECT COUNT(*)
+    ${fromTxsByContent} ${bondFilter({ source, validator })}`)
+
 export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
-  slonikQuery(sql.unsafe`
-    SELECT * ${fromTxsByContent}
-    WHERE ${matchContentType("tx_bond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}
-    ${paginate("blockHeight", DESC, limit, offset)}`, { type: SELECT })
+  slonikSelect(sql.unsafe`SELECT *
+    ${fromTxsByContent} ${bondFilter({ source, validator })}
+    ${bondUnbondPagination({ limit, offset })}`)
+
+const unbondFilter = ({ source, validator }) => sql.fragment`
+  WHERE ${matchContentType("tx_unbond.wasm")}
+    AND ${matchSourceOrValidator({ source, validator })}`
+
 export const unbondCount = ({ source = "", validator = "" }) =>
-  slonikCount(sql.unsafe`
-    SELECT COUNT(*) ${fromTxsByContent}
-    WHERE ${matchContentType("tx_unbond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}`)
+  slonikCount(sql.unsafe`SELECT COUNT(*)
+    ${fromTxsByContent} ${unbondFilter({ source, validator })}`)
+
 export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
-  slonikQuery(sql.unsafe`
-    SELECT * ${fromTxsByContent}
-    WHERE ${matchContentType("tx_unbond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}
-    ${paginate("blockHeight", DESC, limit, offset)}`, { type: SELECT })
+  slonikSelect(sql.unsafe`SELECT *
+    ${fromTxsByContent} ${unbondFilter({ source, validator })}
+    ${bondUnbondPagination({ limit, offset })}`)
+
+export const proposalsWithoutResults = () =>
+  slonikSelect(sql.unsafe`SELECT id FROM proposals WHERE result is null`)
+    .then(rows=>rows.map(row=>row.id))
 
 export const txWithAddressCount = async ({ address = "" }) => await count(`
     SELECT COUNT(*) FROM "transactions"
@@ -523,17 +549,4 @@ export const validatorNamadaAddressToConsensusAddresses = async (namadaAddress) 
     }
   }
   return addresses
-}
-
-export const defaultAttributes = (args = {}) => {
-  const attrs = { exclude: ['createdAt', 'updatedAt'] }
-  if (args instanceof Array) {
-    attrs.include = args
-  } else if (args instanceof Object) {
-    if (args.include) attrs.include = [...new Set([...attrs.include||[], ...args.include])]
-    if (args.exclude) attrs.exclude = [...new Set([...attrs.exclude||[], ...args.exclude])]
-  } else {
-    throw new Error('defaultAttributes takes Array or Object')
-  }
-  return attrs
 }

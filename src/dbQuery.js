@@ -6,6 +6,7 @@ import { intoRecord } from '@hackbg/into'
 import {
   sql,
   count,
+  toCount, 
   slonikCount,
   slonikSelect,
   fromTxsByContent,
@@ -400,13 +401,14 @@ export const proposalsWithoutResults = () =>
   slonikSelect(sql.unsafe`SELECT id FROM proposals WHERE result is null`)
     .then(rows=>rows.map(row=>row.id))
 
-export const txWithAddressCount = async ({ address = "" }) => await count(`
+export const txWithAddressCount = async ({ address = "" }) => await toCount(
+    db.query(`
     SELECT COUNT(*) FROM "transactions"
     WHERE
     "txData"->'data'->'type'->'Wrapper'->'payer' = :address
     OR
     "txData"->'data'->'content'->'data'->'targets'->0->0->'owner' = :address
-`, { replacements: { address: JSON.stringify(address) } })
+`, { type: COUNT, replacements: { address: JSON.stringify(address) } }))
 
 export const txWithAddressList = async ({
   address   = "",
@@ -418,6 +420,7 @@ export const txWithAddressList = async ({
     "txData"->'data'->'type'->'Wrapper'->'payer' = :address
     OR
     "txData"->'data'->'content'->'data'->'targets'->0->0->'owner' = :address
+    ORDER BY "blockHeight" DESC LIMIT :limit OFFSET :offset
 `, {
   type: SELECT, replacements: {
     address: JSON.stringify(address),

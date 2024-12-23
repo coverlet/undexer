@@ -477,14 +477,17 @@ export const transferCount = ({ address = "", source = address, target = address
   WITH
     "transactionData" AS (
       SELECT
-        jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
+        jsonb_path_query("txData", '$.data.content.data[*]') as "txData",
+        jsonb_path_query("txData", '$.data.content.type') as "txType"
       FROM "transactions"
     ),
     "transfers" AS (
       SELECT
+        "txType",
         jsonb_path_query("txData", '$.sources[*].owner') AS source,
         jsonb_path_query("txData", '$.targets[*].owner') AS target
       FROM "transactionData"
+      WHERE "txType" = '"tx_transfer.wasm"'
     )
   SELECT COUNT(*) FROM "transfers"
   WHERE "source" = :source OR "target" = :target
@@ -510,21 +513,24 @@ export const transferList = async ({
           "blockHeight",
           "txHash",
           "txTime",
-          jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
+          jsonb_path_query("txData", '$.data.content.data[*]') as "txData",
+          jsonb_path_query("txData", '$.data.content.type') as "txType"
         FROM "transactions"
-      ),
-      "transfers" AS (
-        SELECT
+        ),
+        "transfers" AS (
+          SELECT
           "blockHeight",
           "txHash",
           "txTime",
+          "txType",
           jsonb_path_query("txData", '$.sources[*].owner') AS source,
           jsonb_path_query("txData", '$.sources[*].token') AS sourceToken,
           jsonb_path_query("txData", '$.sources[*][1]')    AS sourceAmount,
           jsonb_path_query("txData", '$.targets[*].owner') AS target,
           jsonb_path_query("txData", '$.targets[*].token') AS targetToken,
           jsonb_path_query("txData", '$.targets[*][1]')    AS targetAmount
-        FROM "transactionData"
+          FROM "transactionData"
+          WHERE "txType" = '"tx_transfer.wasm"'
       )
     SELECT * FROM "transfers"
     WHERE "source" = :source OR "target" = :target

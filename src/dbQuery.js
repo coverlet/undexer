@@ -473,13 +473,12 @@ export const transferredTokens = () => db.query(`
   FROM "transactionData"
 `)
 
-export const transferCount = ({ address = "", source = address, target = address, }) => count(`
+export const transferCount = ({ address = "", source = address, target = address, }) => db.query(`
   WITH
     "transactionData" AS (
       SELECT
         jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
       FROM "transactions"
-      WHERE "txData"->'data'->'content'->'type' = '"tx_transfer.wasm"'
     ),
     "transfers" AS (
       SELECT
@@ -495,7 +494,7 @@ export const transferCount = ({ address = "", source = address, target = address
     source: JSON.stringify(source),
     target: JSON.stringify(target),
   }
-})
+}).then(query=>Number(query[0][0].count))
 
 export const transferList = async ({
   address = "",
@@ -513,7 +512,6 @@ export const transferList = async ({
           "txTime",
           jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
         FROM "transactions"
-        WHERE "txData"->'data'->'content'->'type' = '"tx_transfer.wasm"'
       ),
       "transfers" AS (
         SELECT

@@ -48,3 +48,6 @@ tpush:
 fpush:
   git push -fu github
   git push -fu origin
+ftpush:
+  git push --tags -fu github
+  git push --tags -fu origin

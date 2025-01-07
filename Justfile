@@ -42,6 +42,9 @@ repl:
 push:
   git push -u github
   git push -u origin
+tpush:
+  git push --tags -u github
+  git push --tags -u origin
 fpush:
   git push -fu github
   git push -fu origin

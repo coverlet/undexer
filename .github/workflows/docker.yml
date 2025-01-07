@@ -1,10 +1,9 @@
 name: Docker 🐳
 on:
-  workflow_dispatch:
+  #workflow_dispatch:
   push:
-    branches:
-      - main
-      - 'v[0-9]+.+'
+    tags:
+      - '**'
 env:
   GIT_LFS_SKIP_SMUDGE: 1
 permissions:

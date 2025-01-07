@@ -61,20 +61,26 @@ export const txsByContent =
 export const fromTxsByContent =
   sql.fragment`FROM (${txsByContent})`
 
-export const matchContentType = type =>
-  sql.fragment`content->'type' = ${sql.jsonb(type)}`
-
 export const OR = (a, b) =>
   sql.fragment`(${a} OR ${b})`
 
-export const matchSourceOrValidator = ({ source, validator }) =>
+export const AND = (a, b) =>
+  sql.fragment`(${a} AND ${b})`
+
+export const matchContentType = type =>
+  sql.fragment`content->'type' = ${sql.jsonb(type)}`
+
+export const matchContentAddress = (address) =>
+  sql.fragment`content->'data'->'address' = ${sql.jsonb(address)}`
+
+export const matchContentSourceOrValidator = ({ source, validator }) =>
   (source && validator)
     ? OR(
-      sql.fragment`content->'data'->>'source' = ${source}`,
-      sql.fragment`content->'data'->>'validator' = ${validator}`
+      sql.fragment`content->'data'->'source' = ${sql.jsonb(source)}`,
+      sql.fragment`content->'data'->'validator' = ${sql.jsonb(validator)}`
     ) :
   (source)
-    ? sql.fragment`content->'data'->>'source' = ${source}` :
+    ? sql.fragment`content->'data'->'source' = ${sql.jsonb(source)}` :
   (validator)
-    ? sql.fragment`content->'data'->>'validator' = ${validator}`
+    ? sql.fragment`content->'data'->'validator' = ${sql.jsonb(validator)}`
     : sql.fragment`true`

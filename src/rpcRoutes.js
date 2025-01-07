@@ -63,7 +63,7 @@ rpcRoutes['/staking-rewards-rate'] = chain => async function multiRpcTokenDenomi
   return { ...rpcResponseMeta(chain), ...await chain.fetchStakingRewardsRate() }
 }
 
-rpcRoutes['/balances/:address'] = chain => async function dbBalances (req, _) {
+rpcRoutes['/balances/:address'] = chain => async function rpcBalances (req, _) {
   if (!req?.params?.address) {
     throw new Error('Missing URL parameter: address', { code: 400 });
   }

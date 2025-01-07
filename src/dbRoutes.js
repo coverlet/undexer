@@ -95,6 +95,24 @@ dbRoutes['/txs'] = async function dbTransactions (req, res) {
   return send200(res, { timestamp, chainId, count, txs: rows })
 } 
 
+dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
+  const { address } = req.params;
+  const { limit, offset } = pagination(req)
+  try {
+    const [count, transactions] = await Promise.all([
+      Query.txWithAddressCount({ address }),
+      Query.txWithAddressList({ address, limit, offset }),
+    ])
+    return send200(res, { count, transactions });
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return send500(res, 'Failed to fetch transactions');
+  }
+}
+
 dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
   const txHash = req?.params?.txHash
   if (!txHash) {
@@ -278,7 +296,7 @@ dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
 }
 
 dbRoutes['/proposal/:id'] = async function dbProposal(req, res) {
-  if (!req?.params?.id) {
+  if (!('id' in req?.params||{})) {
     return send400(res, 'Missing URL parameter: id')
   }
   const id = req.params.id
@@ -384,24 +402,6 @@ dbRoutes['/transfers'] = async function dbTransfers (req, res) {
     Query.transferList({ address, source, target, limit, offset }),
   ])
   return send200(res, { count, transfers })
-}
-
-dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
-  if (!req?.params?.address) {
-    return send400(res, 'Missing URL parameter: address')
-  }
-  const { address } = req.params;
-  const { limit, offset } = pagination(req)
-  try {
-    const [count, transactions] = await Promise.all([
-      Query.txWithAddressCount({ address }),
-      Query.txWithAddressList({ address, limit, offset }),
-    ])
-    return send200(res, { count, transactions });
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
-    return send500(res, 'Failed to fetch transactions');
-  }
 }
 
 export default function getDbRouter () {

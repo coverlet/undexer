@@ -1,6 +1,6 @@
 | 😀 | important announcement |
 | - | - |
-| ![](https://raw.githubusercontent.com/hackbg/undexer/refs/heads/v4/tests/.kibosh.png) | **problems running undexer?** you don't say. we'd be happy to look into it; however as our telepath department is currently undertaking security training we implore you to [eagerly report any issues you may encounter in this form](github.com/hackbg/undexer/issues/new), with as many words, screenshots, log pastes, etc. as you can manage. this is the most actionable way to get them resolved. plus, it provides us with insights about undexer usage in the wild!|
+| ![](https://raw.githubusercontent.com/hackbg/undexer/refs/heads/v4/tests/.kibosh.png) | **problems running undexer?** you don't say. we'll be happy to look into it; however as our telepath department is currently undertaking security training we implore you to [eagerly report any issues you may encounter in this form](github.com/hackbg/undexer/issues/new), with as many words, screenshots, log pastes, etc. as you can manage. this is the most actionable way to get them resolved. plus, it provides us with insights about undexer usage in the wild!|
 
 ---
 

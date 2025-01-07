@@ -1,8 +1,13 @@
 #!/usr/bin/env -S node --import @ganesha/esbuild
-await import('./testDb.js')
 import process from 'node:process'
+
 import { Console } from "@hackbg/logs"
 const console = new Console("Test: API (DB routes)")
+
+util.inspect.defaultOptions.depth = 4
+import util from 'node:util'
+
+await import('./testDb.js')
 
 const { dbRoutes } = await import('../src/dbRoutes.js')
 const testRoute = (route, params = {}, query = {}) =>
@@ -32,7 +37,9 @@ try {
   await testDbRoute('/search')
   await testDbRoute('/block')
   await testDbRoute('/txs')
-  await testDbRoute('/tx/:txHash')
+  await testDbRoute('/tx/:txHash', {
+    txHash: "866CF0ADF6636AF913B6799FE67078F4DA6C572961F0FD247BC3FF5899D9D2B2",
+  })
   await testDbRoute('/transactions/:address', {
     address: "tnam1qqgccstk66854ffyzytdzue3d593gxxayveecl7e"
   }, { limit: 5 })

@@ -22,11 +22,11 @@ export const overview = ({ limit = 10 } = {}) => intoRecord({
   totalBlocks,
   oldestBlock,
   latestBlock,
-  latestBlocks: blocksLatest({ limit }).then(x=>x.rows),
+  latestBlocks: blocksLatest({ limit }).then(x=>x.rows.map(row=>row.get())),
   totalTransactions,
-  latestTransactions: transactionsLatest({ limit }),
+  latestTransactions: transactionsLatest({ limit }).then(x=>x.map(row=>row.get())),
   totalValidators,
-  topValidators: validatorsTop({ limit }),
+  topValidators: validatorsTop({ limit }).then(x=>x.map(row=>row.get())),
   totalProposals,
   totalVotes, })
 
@@ -43,8 +43,11 @@ export const status = () => intoRecord({
 /** Query all available searches. */
 export const search = async (q = '') => {
   q = String(q||'').trim()
-  const [ blocks, transactions, proposals ] = await Promise.all(
-    [searchBlocks, searchTransactions, searchProposals].map((f)=>f(q)))
+  const [ blocks, transactions, proposals ] = await Promise.all([
+    searchBlocks,
+    searchTransactions,
+    searchProposals
+  ].map(f=>f(q).then(rows=>rows.map(row=>row?.get()))))
   return { blocks, transactions, proposals }}
 
 /// GOVERNANCE ////////////////////////////////////////////////////////////////////////////////////

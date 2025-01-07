@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { Console } from "@hackbg/logs"
 const console = new Console("Test: pgmock setup")
 import process from 'node:process'

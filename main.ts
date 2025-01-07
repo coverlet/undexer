@@ -464,11 +464,11 @@ export default class UndexerCommands extends Commands {
     info: 'query transactions with given address',
     args: 'ADDRESS'
   }, async (address: string) => {
-    const { txWithAddressCount, txWithAddressList } = await import('./src/dbQuery.js')
+    const { txByAddressCount, txByAddressList } = await import('./src/dbQuery.js')
     const t0 = performance.now()
     this.log
-      .log(await txWithAddressCount({ address }), 'tx(s) with', bold(address))
-      .log(await txWithAddressList({ address }))
+      .log(await txByAddressCount({ address }), 'tx(s) with', bold(address))
+      .log(await txByAddressList({ address }))
       .log(`Done in ${(performance.now() - t0).toFixed(3)}msec`)
   })
 

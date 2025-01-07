@@ -41,7 +41,7 @@ try {
     txHash: "866CF0ADF6636AF913B6799FE67078F4DA6C572961F0FD247BC3FF5899D9D2B2",
   })
   await testDbRoute('/transactions/:address', {
-    address: "tnam1qqgccstk66854ffyzytdzue3d593gxxayveecl7e"
+    address: "tnam1q84gt6aew50eapplqqh80suu8yenu5xw0q6l2vdk"
   }, { limit: 5 })
   await testDbRoute('/validators')
   await testDbRoute('/validators/states')

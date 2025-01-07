@@ -322,10 +322,10 @@ export const transactionsLatest = ({ limit = 15 } = {}) =>
   })
 export const transactionsAtHeight = (blockHeight = 0) =>
   DB.Transaction.findAndCountAll({ where: { blockHeight } })
-export const txWithAddressCount = ({ address = "" }) =>
+export const txByAddressCount = ({ address = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*) ${fromTxsByContent}
     WHERE ${txByAddressFilter(address)}`)
-export const txWithAddressList = ({ address = "", limit = 100, offset = 0 }) =>
+export const txByAddressList = ({ address = "", limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT * ${fromTxsByContent}
     WHERE ${txByAddressFilter(address)}
     ORDER BY "blockHeight" DESC LIMIT ${limit} OFFSET ${offset}`)
@@ -410,9 +410,9 @@ const bondFilter = ({ source, validator }) => AND(
 const unbondFilter = ({ source, validator }) => AND(
   matchContentType("tx_unbond.wasm"),
   matchContentSourceOrValidator({ source, validator }))
-const txByAddressFilter = address => OR(sql.fragment`true`, OR(
+const txByAddressFilter = address => OR(
   bondOrUnbondFilter({ source: address, validator: address }),
-  validatorTxFilter(address)))
+  validatorTxFilter(address))
 const becomeValidatorFilter = address => AND(
   matchContentType("tx_become_validator.wasm"),
   matchContentAddress(address))

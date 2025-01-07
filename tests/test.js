@@ -2,5 +2,6 @@
 await Promise.all([
   import('./testApiDb.js'),
   import('./testApiRpc.js'),
+  import('./testIndexing.js'),
 ])
 

@@ -85,16 +85,34 @@ dbRoutes['/block'] = async function dbBlock (req, res) {
     epoch:            block.epoch,
     transactionCount: transactions.count,
     transactions:     transactions.rows.map(row => row.toJSON()),
-    proposer:         proposerInfo,
-    signers:          signersInfo,
+    proposer:         proposerInfo?.get(),
+    signers:          signersInfo.map(x=>x?.get()),
   })
 }
 
 dbRoutes['/txs'] = async function dbTransactions (req, res) {
   const timestamp = new Date().toISOString()
   const { rows, count } = await Query.transactionList(pagination(req))
-  return send200(res, { timestamp, chainId, count, txs: rows })
+  return send200(res, { timestamp, chainId, count, txs: rows.map(x=>x.get()) })
 } 
+
+dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
+  if (!req?.params?.address) {
+    return send400(res, 'Missing URL parameter: address')
+  }
+  const { address } = req.params;
+  const { limit, offset } = pagination(req)
+  try {
+    const [count, transactions] = await Promise.all([
+      Query.txByAddressCount({ address }),
+      Query.txByAddressList({ address, limit, offset }),
+    ])
+    return send200(res, { count, transactions });
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return send500(res, 'Failed to fetch transactions');
+  }
+}
 
 dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
   const txHash = req?.params?.txHash
@@ -105,7 +123,7 @@ dbRoutes['/tx/:txHash'] = async function dbTransaction (req, res) {
   if (tx === null) {
     return send404(res, 'Transaction not found');
   }
-  return send200(res, tx)
+  return send200(res, tx.get())
 }
 
 dbRoutes['/validators'] = async function dbValidators (req, res) {
@@ -209,7 +227,7 @@ dbRoutes['/validator/votes/:address'] = async function dbValidatorVotes(req, res
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs, order
   });
-  return send200(res, { count, votes: rows });
+  return send200(res, { count, votes: rows.map(row=>row.get()) });
 }
 
 dbRoutes['/bonds-and-unbonds'] = async function dbBonds (req, res) {
@@ -265,7 +283,7 @@ dbRoutes['/proposals'] = async function dbProposals (req, res) {
   const { rows, count } = await DB.Proposal.findAndCountAll({
     order, limit, offset, where, attributes: attrs
   });
-  return send200(res, { count, proposals: rows })
+  return send200(res, { count, proposals: rows.map(row=>row.get()) })
 }
 
 dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
@@ -281,7 +299,7 @@ dbRoutes['/proposals/stats'] = async function dbProposalStats (_req, res) {
 }
 
 dbRoutes['/proposal/:id'] = async function dbProposal(req, res) {
-  if (!req?.params?.id) {
+  if (!('id' in req?.params||{})) {
     return send400(res, 'Missing URL parameter: id')
   }
   const id = req.params.id
@@ -308,8 +326,14 @@ dbRoutes['/proposal/:id'] = async function dbProposal(req, res) {
   })
   const votingResults = { totalYayPower, totalNayPower, totalAbstainPower, totalVotingPower }
 
-  const result = await DB.Proposal.findOne({ where: { id }, attributes: defaultAttributes(), });
-  return result ? send200(res, { ...(result.get()), votingResults }) : send404(res, 'Proposal not found');
+  let result = await DB.Proposal.findOne({ where: { id }, attributes: defaultAttributes(), });
+  if (result) {
+    result = result.get()
+    result.votes = result.votes?.map(vote=>vote.get())
+    return send200(res, { ...result, votingResults })
+  } else {
+    return send404(res, 'Proposal not found')
+  }
 }
 
 dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
@@ -391,24 +415,6 @@ dbRoutes['/transfers'] = async function dbTransfers (req, res) {
     Query.transferList({ address, source, target, limit, offset }),
   ])
   return send200(res, { count, transfers })
-}
-
-dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (req, res) {
-  if (!req?.params?.address) {
-    return send400(res, 'Missing URL parameter: address')
-  }
-  const { address } = req.params;
-  const { limit, offset } = pagination(req)
-  try {
-    const [count, transactions] = await Promise.all([
-      Query.txWithAddressCount({ address }),
-      Query.txWithAddressList({ address, limit, offset }),
-    ])
-    return send200(res, { count, transactions });
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
-    return send500(res, 'Failed to fetch transactions');
-  }
 }
 
 export default function getDbRouter () {

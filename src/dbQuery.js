@@ -4,40 +4,133 @@ import { Sequelize, Op, QueryTypes } from "sequelize"
 import { intoRecord } from '@hackbg/into'
 
 import {
-  sql,
-  count,
-  toCount, 
-  slonikCount,
-  slonikSelect,
-  fromTxsByContent,
-  matchContentType,
-  matchSourceOrValidator,
-  paginateByContent,
+  sql, count, toCount,
+  slonikCount, slonikSelect,
+  fromTxsByContent, paginateByContent,
+  matchContentAddress, matchContentType, matchContentSourceOrValidator,
+  ASC, DESC, OR, AND,
   defaultAttributes,
-  ASC, DESC,
-  OR
 } from './dbUtil.js'
 
 const { SELECT, COUNT } = QueryTypes
+const BLOCK_LIST_ATTRIBUTES = [ 'blockHeight', 'blockHash', 'blockTime', 'epoch' ]
 
-export const totalTransactions = () =>
-  DB.Transaction.count()
+/// GLOBAL ////////////////////////////////////////////////////////////////////////////////////////
 
-export const totalVotes = () =>
-  DB.Vote.count()
+/** Display an overview. */
+export const overview = ({ limit = 10 } = {}) => intoRecord({
+  totalBlocks,
+  oldestBlock,
+  latestBlock,
+  latestBlocks: blocksLatest({ limit }).then(x=>x.rows.map(row=>row.get())),
+  totalTransactions,
+  latestTransactions: transactionsLatest({ limit }).then(x=>x.map(row=>row.get())),
+  totalValidators,
+  topValidators: validatorsTop({ limit }).then(x=>x.map(row=>row.get())),
+  totalProposals,
+  totalVotes, })
 
+/** Display status. */
+export const status = () => intoRecord({
+  totalBlocks,
+  oldestBlock,
+  latestBlock,
+  totalTransactions,
+  totalValidators,
+  totalProposals,
+  totalVotes, })
+
+/** Query all available searches. */
+export const search = async (q = '') => {
+  q = String(q||'').trim()
+  const [ blocks, transactions, proposals ] = await Promise.all([
+    searchBlocks,
+    searchTransactions,
+    searchProposals
+  ].map(f=>f(q).then(rows=>rows.map(row=>row?.get()))))
+  return { blocks, transactions, proposals }}
+
+/// GOVERNANCE ////////////////////////////////////////////////////////////////////////////////////
+
+/** Count proposals. */
 export const totalProposals = () =>
   DB.Proposal.count()
 
-export const totalBlocks = () =>
-  DB.Block.count()
+/** Retrieve ids of all proposals without stored results. */
+export const proposalsWithoutResults = () =>
+  slonikSelect(sql.unsafe`SELECT id FROM proposals WHERE result is null`)
+    .then(rows=>rows.map(row=>row.id))
+
+/** Find proposal by id. */
+export const searchProposals = async id => {
+  id = Number(id)
+  return isNaN(id) ? [] : [await DB.Proposal.findOne({
+    where:      { id },
+    attributes: { exclude: [ 'createdAt', 'updatedAt' ] }, })]}
+
+/** Count votes. */
+export const totalVotes = () =>
+  DB.Vote.count()
+
+/// VALIDATORS ////////////////////////////////////////////////////////////////////////////////////
+
+/** Count all validators. */
+export const totalValidators = async (epoch) => {
+  epoch = await latestEpochFromValidators(epoch)
+  const where = {}
+  if (!isNaN(epoch)) where.epoch = epoch
+  return DB.Validator.count({ where })
+}
+
+/** Find a validator by consensus hash. */
+export const validatorByConsensusAddress = consensusAddress => DB.Validator.findOne({
+  attributes: [ 'namadaAddress', 'publicKey', 'consensusAddress', 'metadata' ],
+  where: { consensusAddress }
+})
+
+/** Return top N validators. */
+export const validatorsTop = ({ limit = 15 } = {}) => DB.Validator.findAll({
+  attributes: defaultAttributes(), order: [['stake', 'DESC']], limit, offset: 0,
+})
+
+/** Return all consensus addresses for a validator identified by public key. */
+export const validatorPublicKeyToConsensusAddresses = async (publicKey) => {
+  const addresses = new Set()
+  if (publicKey) {
+    const attributes = { include: [ 'consensusAddress' ] }
+    const where = { publicKey }
+    const records = await DB.Validator.findAll({ attributes, where })
+    for (const record of records) {
+      if ((record.consensusAddress||"").trim().length > 0) {
+        addresses.add(record.consensusAddress)
+      }
+    }
+  }
+  return addresses
+}
+
+/** Return all consensus addresses for a validator identified by Namada address. */
+export const validatorNamadaAddressToConsensusAddresses = async (namadaAddress) => {
+  const addresses = new Set()
+  if (namadaAddress) {
+    const attributes = { include: [ 'consensusAddress' ] }
+    const where = { namadaAddress }
+    const records = await DB.Validator.findAll({ attributes, where })
+    for (const record of records) {
+      if ((record.consensusAddress||"").trim().length > 0) {
+        addresses.add(record.consensusAddress)
+      }
+    }
+  }
+  return addresses
+}
+
+/// EPOCHS ////////////////////////////////////////////////////////////////////////////////////////
 
 export const latestEpoch = () =>
   DB.Epoch.max('id')
-
 export const latestEpochFromBlock = () =>
   DB.Block.max('epoch')
-
 export const latestEpochFromValidators = async (epoch) => {
   epoch = Number(epoch)
   if (isNaN(epoch)) {
@@ -48,57 +141,55 @@ export const latestEpochFromValidators = async (epoch) => {
   }
   return epoch
 }
+export const epochs = ({ limit = 10, before, after }) =>
+  before ? epochsBefore({ before, limit }) :
+   after ? epochsAfter({ after, limit })   :
+           epochsLatest({ limit })
+export const epochsLatest = ({ limit = 10 }) => DB.Block.findAll({
+  where: { "epoch": { [Op.not]: null } },
+  attributes: [
+    "epoch",
+    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
+    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
+  ],
+  order: [['epoch', 'DESC']],
+  group: "epoch",
+  limit,
+})
+export const epochsBefore = ({ limit = 10, before }) => DB.Block.findAll({
+  where: { "epoch": { [Op.not]: null, [Op.lte]: before } },
+  attributes: [
+    "epoch",
+    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
+    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
+  ],
+  order: [['epoch', 'DESC']],
+  group: "epoch",
+  limit,
+})
+export const epochsAfter = ({ limit = 10, after }) => DB.Block.findAll({
+  where: { "epoch": { [Op.not]: null, [Op.gte]: after } },
+  attributes: [
+    "epoch",
+    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
+    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
+  ],
+  order: [['epoch', 'ASC']],
+  group: "epoch",
+  limit,
+})
 
+/// BLOCKS ////////////////////////////////////////////////////////////////////////////////////////
+
+export const totalBlocks = () =>
+  DB.Block.count()
 export const latestBlock = () =>
   DB.Block.max('blockHeight')
-
 export const oldestBlock = () =>
   DB.Block.min('blockHeight')
-
-export const totalValidators = async (epoch) => {
-  epoch = await latestEpochFromValidators(epoch)
-  const where = {}
-  if (!isNaN(epoch)) where.epoch = epoch
-  return DB.Validator.count({ where })
-}
-
-export const overview = ({ limit = 10 } = {}) => intoRecord({
-  totalBlocks,
-  oldestBlock,
-  latestBlock,
-  latestBlocks: blocksLatest({ limit }).then(x=>x.rows),
-  totalTransactions,
-  latestTransactions: transactionsLatest({ limit }),
-  totalValidators,
-  topValidators: validatorsTop({ limit }),
-  totalProposals,
-  totalVotes,
-})
-
-export const status = () => intoRecord({
-  totalBlocks,
-  oldestBlock,
-  latestBlock,
-  totalTransactions,
-  totalValidators,
-  totalProposals,
-  totalVotes,
-})
-
-export const search = async (q = '') => {
-  q = String(q||'').trim()
-  const [ blocks, transactions, proposals ] = await Promise.all([
-    searchBlocks(q),
-    searchTransactions(q),
-    searchProposals(q),
-  ])
-  return { blocks, transactions, proposals }
-}
-
 export const searchBlocks = async blockHeight => {
   blockHeight = Number(blockHeight)
-  if (isNaN(blockHeight)) return []
-  return [
+  return (isNaN(blockHeight)) ? [] : [
     await DB.Block.findOne({
       where:      { blockHeight },
       attributes: { exclude: [ 'createdAt', 'updatedAt' ] },
@@ -165,7 +256,6 @@ export const blocks = async ({
     ))
   }
 }
-
 export const blocksLatest = ({ limit, addresses = [] }) => {
   const where = {}
   if (addresses && addresses.length > 0) {
@@ -178,7 +268,6 @@ export const blocksLatest = ({ limit, addresses = [] }) => {
     where,
   })
 }
-
 export const blocksBefore = ({ before, limit = 15, addresses = [] }) => {
   const where = { blockHeight: { [Op.lte]: before } }
   if (addresses && addresses.length > 0) {
@@ -191,7 +280,6 @@ export const blocksBefore = ({ before, limit = 15, addresses = [] }) => {
     where,
   })
 }
-
 export const blocksAfter = ({ after, limit = 15, addresses = [] }) => {
   const where = { blockHeight: { [Op.gte]: after } }
   if (addresses && addresses.length > 0) {
@@ -204,7 +292,6 @@ export const blocksAfter = ({ after, limit = 15, addresses = [] }) => {
     where,
   })
 }
-
 export const block = async ({ height, hash } = {}) => {
   const attrs = defaultAttributes(['blockHeight', 'blockHash', 'blockHeader', 'epoch'])
   let block
@@ -219,7 +306,6 @@ export const block = async ({ height, hash } = {}) => {
   }
   return block
 }
-
 export const blockByHeightWithTransactions = (blockHeight = 0) => {
   const where = { blockHeight }
   return Promise.all([
@@ -228,61 +314,25 @@ export const blockByHeightWithTransactions = (blockHeight = 0) => {
   ])
 }
 
-export const epochs = ({ limit = 10, before, after }) =>
-  before ? epochsBefore({ before, limit }) :
-   after ? epochsAfter({ after, limit })   :
-           epochsLatest({ limit })
+/// TRANSACTIONS //////////////////////////////////////////////////////////////////////////////////
 
-export const epochsLatest = ({ limit = 10 }) => DB.Block.findAll({
-  where: { "epoch": { [Op.not]: null } },
-  attributes: [
-    "epoch",
-    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
-    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
-  ],
-  order: [['epoch', 'DESC']],
-  group: "epoch",
-  limit,
-})
-
-export const epochsBefore = ({ limit = 10, before }) => DB.Block.findAll({
-  where: { "epoch": { [Op.not]: null, [Op.lte]: before } },
-  attributes: [
-    "epoch",
-    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
-    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
-  ],
-  order: [['epoch', 'DESC']],
-  group: "epoch",
-  limit,
-})
-
-export const epochsAfter = ({ limit = 10, after }) => DB.Block.findAll({
-  where: { "epoch": { [Op.not]: null, [Op.gte]: after } },
-  attributes: [
-    "epoch",
-    [Sequelize.fn("MAX", Sequelize.col("blockHeight")), "maxBlockHeight"],
-    [Sequelize.fn("MIN", Sequelize.col("blockHeight")), "minBlockHeight"],
-  ],
-  order: [['epoch', 'ASC']],
-  group: "epoch",
-  limit,
-})
-
-export const transactionByHash = txHash => {
-  const where = { txHash };
-  const attrs = defaultAttributes({ exclude: ['id'] })
-  return DB.Transaction.findOne({ where, attrs });
-}
-
-export const transactionList = ({ limit, offset } = {}) =>
-  DB.Transaction.findAndCountAll({
-    attributes: defaultAttributes({ exclude: ['id'] }),
-    order: [['blockTime', 'DESC']],
-    limit,
-    offset,
+export const totalTransactions = () =>
+  DB.Transaction.count()
+export const searchTransactions = async txHash => txHash ? [
+  await DB.Transaction.findOne({
+    where:      { txHash },
+    attributes: { exclude: [ 'createdAt', 'updatedAt' ] },
   })
-
+] : []
+export const transactionByHash = txHash => DB.Transaction.findOne({
+  where: { txHash }, attrs: defaultAttributes({ exclude: ['id'] })
+});
+export const transactionList = ({ limit, offset } = {}) => DB.Transaction.findAndCountAll({
+  attributes: defaultAttributes({ exclude: ['id'] }),
+  order: [['blockTime', 'DESC']],
+  limit,
+  offset,
+})
 export const transactionsLatest = ({ limit = 15 } = {}) =>
   DB.Transaction.findAll({
     order: [['blockHeight', 'DESC']],
@@ -297,16 +347,20 @@ export const transactionsLatest = ({ limit = 15 } = {}) =>
       [db.json('txData.data.content.type'), 'txContentType']
     ],
   })
-
 export const transactionsAtHeight = (blockHeight = 0) =>
   DB.Transaction.findAndCountAll({ where: { blockHeight } })
-
+export const txByAddressCount = ({ address = "" }) =>
+  slonikCount(sql.unsafe`SELECT COUNT(*) ${fromTxsByContent}
+    WHERE ${txByAddressFilter(address)}`)
+export const txByAddressList = ({ address = "", limit = 100, offset = 0 }) =>
+  slonikSelect(sql.unsafe`SELECT * ${fromTxsByContent}
+    WHERE ${txByAddressFilter(address)}
+    ORDER BY "blockHeight" DESC LIMIT ${limit} OFFSET ${offset}`)
 export const becomeValidatorCount = async ({ address = "" }) => await count(`
   SELECT COUNT(*) FROM "transactions"
   WHERE "txData"->'data'->'content'->'type' = '"tx_become_validator.wasm"'
   AND "txData"->'data'->'content'->'data'->'address' = :address
 `, { replacements: { address: JSON.stringify(address), } })
-
 export const becomeValidatorList = async ({
   address = "",
   limit   = 100,
@@ -318,13 +372,11 @@ export const becomeValidatorList = async ({
   AND    "txData"->'data'->'content'->'data'->'address' = :address
   ORDER BY "blockHeight" DESC LIMIT :limit OFFSET :offset
 `, { type: SELECT, replacements: { address: JSON.stringify(address), limit, offset, } })
-
 export const changeValidatorMetadataCount = async ({ validator = "" }) => await count(`
   SELECT COUNT(*) FROM "transactions"
   WHERE "txData"->'data'->'content'->'type' = '"tx_change_validator_metadata.wasm"'
   AND "txData"->'data'->'content'->'data'->'validator' = :validator
 `, { replacements: { validator: JSON.stringify(validator), } })
-
 export const changeValidatorMetadataList = async ({
   validator = "",
   limit   = 100,
@@ -336,13 +388,11 @@ export const changeValidatorMetadataList = async ({
   AND    "txData"->'data'->'content'->'data'->'validator' = :validator
   ORDER BY "blockHeight" DESC LIMIT :limit OFFSET :offset
 `, { type: SELECT, replacements: { validator: JSON.stringify(validator), limit, offset, } })
-
 export const deactivateValidatorCount = async ({ address = "" }) => await count(`
   SELECT COUNT(*) FROM "transactions"
   WHERE "txData"->'data'->'content'->'type' = '"tx_deactivate_validator.wasm"'
   AND "txData"->'data'->'content'->'data'->'address' = :address
 `, { replacements: { address: JSON.stringify(address), } })
-
 export const deactivateValidatorList = async ({
   address = "",
   limit   = 100,
@@ -357,45 +407,52 @@ export const deactivateValidatorList = async ({
 
 const bondUnbondPagination = ({ limit, offset }) => paginateByContent(
   "content", sql.fragment`'data'->>'amount'`, sql.fragment`bigint`, DESC, limit, offset)
-
-const bondOrUnbondFilter = ({ source, validator }) => sql.fragment`
-  WHERE ${OR(matchContentType("tx_bond.wasm"), matchContentType("tx_unbond.wasm"))}
-    AND ${matchSourceOrValidator({ source, validator })}`
-
 export const bondAndUnboundCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
-    ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}`)
-
+    ${fromTxsByContent} WHERE ${bondOrUnbondFilter({ source, validator })}`)
 export const bondAndUnboundList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
-    ${fromTxsByContent} ${bondOrUnbondFilter({ source, validator })}
+    ${fromTxsByContent} WHERE ${bondOrUnbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
-
-const bondFilter = ({ source, validator }) => sql.fragment`
-  WHERE ${matchContentType("tx_bond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}`
-
 export const bondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
-    ${fromTxsByContent} ${bondFilter({ source, validator })}`)
-
+    ${fromTxsByContent} WHERE ${bondFilter({ source, validator })}`)
 export const bondList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
-    ${fromTxsByContent} ${bondFilter({ source, validator })}
+    ${fromTxsByContent} WHERE ${bondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
-
-const unbondFilter = ({ source, validator }) => sql.fragment`
-  WHERE ${matchContentType("tx_unbond.wasm")}
-    AND ${matchSourceOrValidator({ source, validator })}`
-
 export const unbondCount = ({ source = "", validator = "" }) =>
   slonikCount(sql.unsafe`SELECT COUNT(*)
-    ${fromTxsByContent} ${unbondFilter({ source, validator })}`)
-
+    ${fromTxsByContent} WHERE ${unbondFilter({ source, validator })}`)
 export const unbondList = ({ source, validator, limit = 100, offset = 0 }) =>
   slonikSelect(sql.unsafe`SELECT *
-    ${fromTxsByContent} ${unbondFilter({ source, validator })}
+    ${fromTxsByContent} WHERE ${unbondFilter({ source, validator })}
     ${bondUnbondPagination({ limit, offset })}`)
+const bondOrUnbondFilter = ({ source, validator }) => AND(
+  OR(matchContentType("tx_bond.wasm"), matchContentType("tx_unbond.wasm")),
+  matchContentSourceOrValidator({ source, validator }))
+const bondFilter = ({ source, validator }) => AND(
+  matchContentType("tx_bond.wasm"),
+  matchContentSourceOrValidator({ source, validator }))
+const unbondFilter = ({ source, validator }) => AND(
+  matchContentType("tx_unbond.wasm"),
+  matchContentSourceOrValidator({ source, validator }))
+const txByAddressFilter = address => OR(
+  bondOrUnbondFilter({ source: address, validator: address }),
+  validatorTxFilter(address))
+const becomeValidatorFilter = address => AND(
+  matchContentType("tx_become_validator.wasm"),
+  matchContentAddress(address))
+const deactivateValidatorFilter = address => AND(
+  matchContentType("tx_deactivate_validator.wasm"),
+  matchContentAddress(address))
+const changeValidatorMetadataFilter = address => AND(
+  matchContentType("tx_change_validator_metadata.wasm"),
+  matchContentSourceOrValidator({ validator: address }))
+export const validatorTxFilter = address => sql.fragment`(
+  ${becomeValidatorFilter(address)}
+  OR ${deactivateValidatorFilter(address)}
+  OR ${changeValidatorMetadataFilter(address)})`
 
 export const proposalsWithoutResults = () =>
   slonikSelect(sql.unsafe`SELECT id FROM proposals WHERE result is null`)
@@ -440,20 +497,21 @@ export const transferredTokens = () => db.query(`
     jsonb_path_query("txData", '$.target[*].token') AS target_token
   FROM "transactionData"
 `)
-
-export const transferCount = ({ address = "", source = address, target = address, }) => count(`
+export const transferCount = ({ address = "", source = address, target = address, }) => db.query(`
   WITH
     "transactionData" AS (
       SELECT
-        jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
+        jsonb_path_query("txData", '$.data.content.data[*]') as "txData",
+        jsonb_path_query("txData", '$.data.content.type') as "txType"
       FROM "transactions"
-      WHERE "txData"->'data'->'content'->'type' = '"tx_transfer.wasm"'
     ),
     "transfers" AS (
       SELECT
+        "txType",
         jsonb_path_query("txData", '$.sources[*].owner') AS source,
         jsonb_path_query("txData", '$.targets[*].owner') AS target
       FROM "transactionData"
+      WHERE "txType" = '"tx_transfer.wasm"'
     )
   SELECT COUNT(*) FROM "transfers"
   WHERE "source" = :source OR "target" = :target
@@ -463,8 +521,7 @@ export const transferCount = ({ address = "", source = address, target = address
     source: JSON.stringify(source),
     target: JSON.stringify(target),
   }
-})
-
+}).then(query=>Number(query[0][0].count))
 export const transferList = async ({
   address = "",
   source  = address,
@@ -479,22 +536,24 @@ export const transferList = async ({
           "blockHeight",
           "txHash",
           "txTime",
-          jsonb_path_query("txData", '$.data.content.data[*]') as "txData"
+          jsonb_path_query("txData", '$.data.content.data[*]') as "txData",
+          jsonb_path_query("txData", '$.data.content.type') as "txType"
         FROM "transactions"
-        WHERE "txData"->'data'->'content'->'type' = '"tx_transfer.wasm"'
-      ),
-      "transfers" AS (
-        SELECT
+        ),
+        "transfers" AS (
+          SELECT
           "blockHeight",
           "txHash",
           "txTime",
+          "txType",
           jsonb_path_query("txData", '$.sources[*].owner') AS source,
           jsonb_path_query("txData", '$.sources[*].token') AS sourceToken,
           jsonb_path_query("txData", '$.sources[*][1]')    AS sourceAmount,
           jsonb_path_query("txData", '$.targets[*].owner') AS target,
           jsonb_path_query("txData", '$.targets[*].token') AS targetToken,
           jsonb_path_query("txData", '$.targets[*][1]')    AS targetAmount
-        FROM "transactionData"
+          FROM "transactionData"
+          WHERE "txType" = '"tx_transfer.wasm"'
       )
     SELECT * FROM "transfers"
     WHERE "source" = :source OR "target" = :target
@@ -508,48 +567,4 @@ export const transferList = async ({
       offset
     }
   })
-}
-
-export const validatorByConsensusAddress = consensusAddress =>
-  DB.Validator.findOne({
-    attributes: [ 'namadaAddress', 'publicKey', 'consensusAddress', 'metadata' ],
-    where: { consensusAddress }
-  })
-
-export const validatorsTop = ({ limit = 15 } = {}) =>
-  DB.Validator.findAll({
-    attributes: defaultAttributes(),
-    order: [['stake', 'DESC']],
-    limit,
-    offset: 0,
-  })
-
-export const validatorPublicKeyToConsensusAddresses = async (publicKey) => {
-  const addresses = new Set()
-  if (publicKey) {
-    const attributes = { include: [ 'consensusAddress' ] }
-    const where = { publicKey }
-    const records = await DB.Validator.findAll({ attributes, where })
-    for (const record of records) {
-      if ((record.consensusAddress||"").trim().length > 0) {
-        addresses.add(record.consensusAddress)
-      }
-    }
-  }
-  return addresses
-}
-
-export const validatorNamadaAddressToConsensusAddresses = async (namadaAddress) => {
-  const addresses = new Set()
-  if (namadaAddress) {
-    const attributes = { include: [ 'consensusAddress' ] }
-    const where = { namadaAddress }
-    const records = await DB.Validator.findAll({ attributes, where })
-    for (const record of records) {
-      if ((record.consensusAddress||"").trim().length > 0) {
-        addresses.add(record.consensusAddress)
-      }
-    }
-  }
-  return addresses
 }

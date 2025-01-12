@@ -1,3 +1,9 @@
+| 😀 | important announcement |
+| - | - |
+| ![](https://raw.githubusercontent.com/hackbg/undexer/refs/heads/v4/tests/.kibosh.png) | **problems running undexer?** you don't say. we'll be happy to look into it; however as our telepath department is currently undertaking security training we implore you to [eagerly report any issues you may encounter in this form](github.com/hackbg/undexer/issues/new), with as many words, screenshots, log pastes, etc. as you can manage. this is the most actionable way to get them resolved. plus, it provides us with insights about undexer usage in the wild!|
+
+---
+
 # Undexer
 
 This is the Undexer. It decodes historical data from a [Namada](https://namada.net/)
@@ -9,7 +15,22 @@ and [`@hackbg/borshest`](https://github.com/hackbg/toolbox/tree/main/borshest).
 
 ## API reference and endpoints
 
-For all endpoints available please refer to the [OpenAPI specs](swagger.yaml).
+The current version of the Undexer API is 4+.
+You can find it at https://undexer.hack.bg/v4.
+
+The API definition a living standard.
+The [OpenAPI specs](swagger.yaml) are deprecated, please refer to them with caution.
+See https://github.com/hackbg/undexer/issues/18.
+
+The API is initialized [here](./bin/api.js). Therefore, for up-to-date information
+on what routes the Undexer API contains and what they do, please refer to:
+
+* [`./src/dbRoutes.js`](./src/dbRoutes.js)
+* [`./src/rpcRoutes.js`](./src/rpcRoutes.js)
+
+|  | protip |
+| - | - |
+| 😀 |For example, you can integrate these route definitions with something that serves Swagger, and send us a PR fixing #18!|
 
 * **API v4 (current):** https://undexer.hack.bg/v4
   * TODO: changelog
@@ -21,9 +42,7 @@ For all endpoints available please refer to the [OpenAPI specs](swagger.yaml).
 
 * **API v1 (decommissioned).**
 
-## Running
-
-### Dockerless staging deployment
+## Dockerless staging deployment
 
 Requires:
 
@@ -50,7 +69,7 @@ pnpm start # concurrently runs api and indexer
 
 * You can use Docker Compose to launch Postgres and hack on the rest outside of the container.
 
-### Dockerized staging deployment
+## Dockerized staging deployment
 
 Requires:
 
@@ -67,12 +86,14 @@ cd undexer
 just up # or `docker compose up`, etc.
 ```
 
-### Production deployment
+## Production deployment
 
-* We use NixOS/systemd/Docker to run this in production.
+We use NixOS/systemd/Docker to run this in production. Thus, Undexer does not manage TLS certificates or terminate HTTPS.
+We use NGINX and automatic ACME/LetsEncrypt cert management provided by NixOS.
 
-* Undexer does not manage TLS certificates or terminate HTTPS.
-  We use NGINX and automatic ACME/LetsEncrypt cert management provided by NixOS.
+|  |  |
+| - | - |
+| 😀 |For example, you can let us know how you run Undexer in production, so that we can provide more detailed deployment and troubleshooting instructions for different environments!|
 
 ## Troubleshooting
 

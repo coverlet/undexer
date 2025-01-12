@@ -104,8 +104,8 @@ dbRoutes['/transactions/:address'] = async function dbTransactionsForAddress (re
   const { limit, offset } = pagination(req)
   try {
     const [count, transactions] = await Promise.all([
-      Query.txByAddressCount({ address }),
-      Query.txByAddressList({ address, limit, offset }),
+      Query.txWithAddressCount({ address }),
+      Query.txWithAddressList({ address, limit, offset }),
     ])
     return send200(res, { count, transactions });
   } catch (error) {

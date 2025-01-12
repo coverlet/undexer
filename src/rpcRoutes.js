@@ -13,9 +13,11 @@ rpcRoutes['/height'] = chain => async function multiRpcHeight (_) {
   return { ...rpcResponseMeta(chain), height: String(await chain.fetchHeight()) }
 }
 
-rpcRoutes['/total-staked'] = chain => async function multiRpcTotalStaked (_) {
-  return { ...rpcResponseMeta(chain), totalStaked: String(await chain.fetchTotalStaked()) }
+rpcRoutes['/total-staked'] = chain => async function multiRpcTotalStaked (req) {
+  const { epoch = null } = req?.query ?? {}
+  return { ...rpcResponseMeta(chain), totalStaked: String(await chain.fetchTotalStaked(epoch)) }
 }
+
 
 rpcRoutes['/epoch'] = chain => async function multiRpcEpoch (_) {
   const [epoch, firstBlock, duration] = await Promise.all([

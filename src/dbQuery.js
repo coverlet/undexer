@@ -4,7 +4,7 @@ import { Sequelize, Op, QueryTypes } from "sequelize"
 import { intoRecord } from '@hackbg/into'
 
 import {
-  sql, count,
+  sql, count, toCount,
   slonikCount, slonikSelect,
   fromTxsByContent, paginateByContent,
   matchContentAddress, matchContentType, matchContentSourceOrValidator,
@@ -13,7 +13,7 @@ import {
 } from './dbUtil.js'
 
 const { SELECT, COUNT } = QueryTypes
-const BLOCK_LIST_ATTRIBUTES = [ 'blockHeight', 'blockHash', 'blockTime', 'epoch' ]
+const BLOCK_LIST_ATTRIBUTES = [ 'blockHeight', 'blockHash', 'blockTime', [db.json("blockHeader.proposerAddress"), "proposerConsensusKey"], 'epoch' ]
 
 /// GLOBAL ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -508,3 +508,29 @@ export const transferList = async ({
     }
   })
 }
+export const txWithAddressCount = async ({ address = "" }) => await toCount(
+  db.query(`
+  SELECT COUNT(*) FROM "transactions"
+  WHERE
+  "txData"->'data'->'type'->'Wrapper'->'payer' = :address
+  OR
+  "txData"->'data'->'content'->'data'->'targets'->0->0->'owner' = :address
+`, { type: COUNT, replacements: { address: JSON.stringify(address) } }))
+
+export const txWithAddressList = async ({
+  address   = "",
+  limit     = 100,
+  offset    = 0
+}) => await db.query(`
+  SELECT * FROM "transactions"
+    WHERE
+    "txData"->'data'->'type'->'Wrapper'->'payer' = :address
+    OR
+    "txData"->'data'->'content'->'data'->'targets'->0->0->'owner' = :address
+    ORDER BY "blockHeight" DESC LIMIT :limit OFFSET :offset`, {
+  type: SELECT, replacements: {
+    address: JSON.stringify(address),
+    limit,
+    offset
+  }
+})

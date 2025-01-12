@@ -4,6 +4,7 @@ import * as DB from './db.js';
 import * as Query from './dbQuery.js';
 import { defaultAttributes } from './dbUtil.js';
 import { CHAIN_ID } from './config.js';
+import { Op } from "sequelize";
 import {
   withConsole,
   pagination, relativePagination,
@@ -129,7 +130,9 @@ dbRoutes['/validators'] = async function dbValidators (req, res) {
   const { limit, offset } = pagination(req)
   const epoch = await Query.latestEpochFromValidators(req?.query?.epoch)
   const { state } = req.query
-  const where = {}
+  const where = {
+    stake: {[Op.ne]: null}
+  }
   if (!isNaN(epoch)) where['epoch'] = epoch
   if (state) where['state.state'] = state
   const order = [literal('"stake" collate "numeric" DESC')]
@@ -339,6 +342,10 @@ dbRoutes['/proposal/votes/:id'] = async function dbProposalVotes (req, res) {
   }
   const { limit, offset } = pagination(req);
   const where = { proposal: req.params.id };
+  const { voter } = req.query
+  if(voter) {
+    where.delegator = voter
+  }
   const attrs = defaultAttributes();
   const { count, rows } = await DB.Vote.findAndCountAll({
     limit, offset, where, attributes: attrs,
